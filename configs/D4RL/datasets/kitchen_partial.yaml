@@ -1,0 +1,5 @@
+env: "Kitchen"
+policy: "partial"
+dataset_group: "D4RL"
+dataset_entry: ${datasets.dataset_group}/${datasets.env}/${datasets.env}_${datasets.policy}-v0
+env_entry: 'kitchen-partial-v0'

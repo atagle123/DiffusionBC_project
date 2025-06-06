@@ -1,0 +1,45 @@
+defaults:
+  - _self_
+  - datasets: 
+
+serial_number: "paper" # additional identification for experiment
+exp_id: "N_${agent.diffusion.n_timesteps}_${agent.diffusion.schedule}_${serial_number}"
+seed: 1264 # this changes
+
+
+wandb:
+  wandb_dataset: ${datasets.env}_${datasets.policy}
+  wandb_exp_name: ${datasets.env}_${datasets.policy}_${exp_id}_${seed}
+
+hydra:
+  run:
+    dir: ./logs/pretrained/${datasets.dataset_entry}/${exp_id}/${seed}
+
+
+dataset:
+  env_entry: ${datasets.env_entry}
+  clip_actions_to_eps: True
+
+agent:
+  savepath:  ./logs/pretrained/${datasets.dataset_entry}/${exp_id}/${seed}/models
+
+  diffusion_network:
+    time_emb: 128
+    hidden_dim: 128
+    num_blocks: 3
+    use_layer_norm: True
+    dropout_rate : 0.1
+
+  diffusion:
+    schedule: "cosine"
+    n_timesteps: 15
+
+  training:
+    steps: 100000
+    ema_decay: 0.995
+    train_batch_size: 1024
+    train_lr: 3e-4
+    step_start_ema: 100000
+    update_ema_every: 10
+    weight_decay:  0.0001
+    eta_min: 1e-5

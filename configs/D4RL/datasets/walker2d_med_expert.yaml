@@ -1,0 +1,5 @@
+env: "Walker2d"
+policy: "medium_expert"
+dataset_group: "D4RL"
+dataset_entry: ${datasets.dataset_group}/${datasets.env}/${datasets.env}_${datasets.policy}-v2
+env_entry: 'walker2d-medium-expert-v2'

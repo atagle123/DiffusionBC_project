@@ -1,0 +1,5 @@
+env: "HalfCheetah"
+policy: "medium_replay"
+dataset_group: "D4RL"
+dataset_entry: ${datasets.dataset_group}/${datasets.env}/${datasets.env}_${datasets.policy}-v2
+env_entry: 'halfcheetah-medium-replay-v2'

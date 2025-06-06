@@ -1,0 +1,5 @@
+env: "Adroit"
+policy: "pen_human"
+dataset_group: "D4RL"
+dataset_entry: ${datasets.dataset_group}/${datasets.env}/${datasets.env}_${datasets.policy}-v0
+env_entry: 'pen-human-v0'
