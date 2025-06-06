@@ -11,3 +11,9 @@ conda env create -f environment.yml
 conda activate diffusion_bc
 conda develop .
 ```
+
+## Run a experiment
+
+```bash
+python scripts/train.py datasets={dataset_name} seed={your_seed}
+```
