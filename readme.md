@@ -1,7 +1,13 @@
-TODO: 
-- BUILD horizons dataset
+# DiffusionBC Project
 
+Requires installation of Mujoco 2.1 first
 
-- agent loads the optimizers and model...
-- agent has a step function that performs a train step...
-- try to use torch compile
+## Setup
+
+Create and activate the conda environment:
+
+```bash
+conda env create -f environment.yml
+conda activate diffusion_bc
+conda develop .
+```
