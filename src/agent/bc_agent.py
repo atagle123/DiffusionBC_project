@@ -3,7 +3,7 @@ import torch
 from src.utils.arrays import DEVICE
 import os
 import copy
-from src.models.temporal import ScoreModel_test
+from src.models.networks import ScoreModel_test
 from src.models.diffusion import GaussianDiffusion
 from src.utils.ema import EMA
 from src.utils.arrays import report_parameters
@@ -98,7 +98,7 @@ class BC_Agent_Test(Agent):
         """
 
         state = torch.tensor(state, dtype=torch.float32, device=DEVICE)
-        samples = self.diffusion_model(state=state).sample.detach()
+        samples = self.diffusion_model(condition=state).sample.detach()
 
         actions = samples
         return actions.cpu().numpy()  # Return the first action
