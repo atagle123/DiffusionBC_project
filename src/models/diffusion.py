@@ -132,9 +132,9 @@ class GaussianDiffusion(nn.Module):
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     @torch.inference_mode()
-    def p_mean_variance(self, x, state, t):
+    def p_mean_variance(self, x, condition, t):
 
-        epsilon = self.model(x=x, state=state, time=t, training=False)
+        epsilon = self.model(x=x, condition=condition, time=t, training=False)
         x_recon = self.predict_start_from_noise(x, t=t, noise=epsilon)
 
         if self.clip_denoised:
@@ -145,13 +145,13 @@ class GaussianDiffusion(nn.Module):
         )
         return model_mean, posterior_variance, posterior_log_variance
 
-    def p_sample(self, x, state, t):
+    def p_sample(self, x, condition, t):
         b, *_, device = *x.shape, x.device
 
         batched_time = torch.full((b,), t, device=device, dtype=torch.long)
 
         model_mean, _, model_log_variance = self.p_mean_variance(
-            x=x, state=state, t=batched_time
+            x=x, condition=condition, t=batched_time
         )
 
         if t > 0:
@@ -163,12 +163,12 @@ class GaussianDiffusion(nn.Module):
 
         return x_pred
 
-    def p_sample_loop(self, state, shape):
+    def p_sample_loop(self, condition, shape):
         """
-        Classical DDPM (check this) sampling algorithm
+        Classical DDPM sampling algorithm
 
             Parameters:
-                state
+                condition
                 shape,
 
             Returns:
@@ -188,7 +188,7 @@ class GaussianDiffusion(nn.Module):
             total=self.n_timesteps,
             disable=self.disable_progess_bar,
         ):
-            x = self.p_sample(x=x, state=state, t=t)
+            x = self.p_sample(x=x, condition=condition, t=t)
             if self.return_chain:
                 chain.append(x)
 
@@ -199,12 +199,13 @@ class GaussianDiffusion(nn.Module):
             x.clamp_(-1.0, 1.0)
 
         return Sample(x, chain)
-
-    def forward(self, state):
+    
+    @torch.no_grad()
+    def forward(self, condition):
         """ """
-        batch_size = state.shape[0]
+        batch_size = condition.shape[0]
 
-        return self.p_sample_loop(state, shape=(batch_size, self.data_dim))
+        return self.p_sample_loop(condition, shape=(batch_size, self.data_dim))
 
     def setup_sampling(
         self,
@@ -231,13 +232,13 @@ class GaussianDiffusion(nn.Module):
 
         return sample
 
-    def p_losses(self, x_start, state, t):
+    def p_losses(self, x_start, condition, t):
 
         noise = torch.randn_like(x_start)
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
-        pred_epsilon = self.model(x_noisy, state, t, training=True)
+        pred_epsilon = self.model(x_noisy, condition, t, training=True)
 
         assert noise.shape == pred_epsilon.shape
 
@@ -245,9 +246,83 @@ class GaussianDiffusion(nn.Module):
 
         return loss, {"loss": loss}
 
-    def loss(self, x, state):
+    def loss(self, x, condition):
 
         batch_size = len(x)
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
 
-        return self.p_losses(x, state, t)
+        return self.p_losses(x, condition, t)
+
+
+
+class FiLMGaussianDiffusion(GaussianDiffusion):
+
+    #------------------------------------------ sampling ------------------------------------------#
+
+    def p_mean_variance(self, x, history, t):
+        assert history is not None  # TODO there must be a condition, in the worst case scenario it consists of only one state. 
+        self.model.condition_diffusion(history)
+
+        epsilon = self.model(x,t)
+
+        x_recon = self.predict_start_from_noise(x, t=t, noise=epsilon)
+
+        if self.clip_denoised:
+            x_recon.clamp_(-1., 1.)
+        else:
+            assert RuntimeError() # NOTE
+
+        model_mean, posterior_variance, posterior_log_variance = self.q_posterior(
+                x_start=x_recon, x_t=x, t=t)
+        return model_mean, posterior_variance, posterior_log_variance
+
+    @torch.no_grad()
+    def p_sample_loop(self, condition, shape, return_chain=False):
+        device = self.betas.device
+
+        x = torch.randn(shape, device=device)
+
+        #self.model.condition_diffusion(condition)
+
+        chain = [x] if return_chain else None
+
+        for t in tqdm(
+            reversed(range(0, self.n_timesteps)),
+            desc="sampling loop time step",
+            total=self.n_timesteps,
+            disable=self.disable_progess_bar,
+        ):
+            x = self.p_sample(x=x, t=t) # TODO fix proeblem with conditioning... 
+
+            if return_chain: 
+                chain.append(x)
+
+        if return_chain: 
+            chain = torch.stack(chain, dim=1)
+
+        if self.clip_denoised:
+            x.clamp_(-1.0, 1.0)
+        return Sample(x, chain)
+
+    #------------------------------------------ training ------------------------------------------#
+
+    def p_losses(self, x_start, condition, t):
+        noise = torch.randn_like(x_start)
+
+        self.model.condition_diffusion(condition)
+        x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
+        x_recon = self.model(x_noisy, t)
+
+        assert noise.shape == x_recon.shape
+
+        loss = F.mse_loss(x_recon, noise, reduction="none").mean() # TODO add weighted loss
+
+        return loss, {"loss": loss}
+
+    def loss(self, x, condition):
+        assert not self.model.conditioning_set(), "Model conditioned with a pre-existing history. Cannot pre-condition model for loss computations."
+        batch_size = len(x)
+        t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
+        losses = self.p_losses(x, condition, t)
+        self.model.clear_conditioning()
+        return losses
