@@ -2,8 +2,6 @@ import numpy as np
 import gym
 from d4rl import get_normalized_score
 
-
-
 def evaluate_parallel(
     policy_fn, envs, env_entry: str, num_episodes: int, seed: int=42, max_num_steps: int=1000,
 ) -> dict[str, float]:
@@ -14,7 +12,7 @@ def evaluate_parallel(
 
     # Iterate over environment steps
     while not np.all(dones): # TODO add a max number of steps
-        actions = policy_fn(state=observations)
+        actions = policy_fn(observations)
 
         # Collect rewards and update states
         next_observations = []
@@ -43,5 +41,6 @@ def evaluate_parallel(
 
     scores = get_normalized_score(env_name=env_entry, score=episode_returns) * 100
     scores_mean = np.mean(scores)
+    scores_std = np.std(scores)
 
-    return {"mean":scores_mean}
+    return {"mean":scores_mean, "std":scores_std}
