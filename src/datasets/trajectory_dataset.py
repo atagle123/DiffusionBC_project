@@ -46,13 +46,45 @@ class EpisodeDataset:
         """Return the number of episodes in the dataset."""
         return len(self.episodes)
     
-    ### normalization
+    def preprocess(self, history_len: int, pad_val: int = 0, normalization: str = "gaussian", fields_to_normalize: list[str] = ["actions", "observations"]):
+        self.normalize(fields_to_normalize=fields_to_normalize, normalization=normalization) # normalize before padding
+        self.shift_actions()
+        self.pad(history_len=history_len, pad_val=pad_val)
+    
+    ### preprocessing methods ###
 
-    def normalize(self):
+    def normalize(self, fields_to_normalize: list[str] = ["actions", "observations"], normalization = "gaussian"): # normalize before padding 
+        norm_params = {}
+        for field in fields_to_normalize: # assert field in episode keys
+            all_data = np.concatenate([ep[field] for ep in self.episodes], axis=0)
+            mean = np.mean(all_data, axis=0)
+            std = np.std(all_data, axis=0) + 1e-8
+            params = {"mean": mean, 
+                      "std": std, 
+                      "max": np.max(all_data, axis=0), 
+                      "min": np.min(all_data, axis=0)}
+            norm_params[field] = params
         
         for episode in self.episodes:
-            pass
+            for field in fields_to_normalize:
+                if normalization == "gaussian":
+                    episode[field] = (episode[field] - norm_params[field]["mean"]) / norm_params[field]["std"]
+                elif normalization == "minmax":
+                    episode[field] = (episode[field] - norm_params[field]["min"]) / (norm_params[field]["max"] - norm_params[field]["min"])
+                else:
+                    raise ValueError(f"Unknown normalization method: {normalization}")
+    
+    def shift_actions(self):
+        """Shift actions to the right by one time step."""
+        for episode in self.episodes:
+            episode['actions'][1:,:] = episode['actions'][:-1,:]
+            episode['actions'][0,:] = 0 # zero padding at the beggining of actions    
 
+    def pad(self, history_len: int, pad_val: int = 0, pad_fields: list[str] = ["actions", "observations"]):
+        assert history_len>=1
+        for episode in self.episodes: 
+            for field in pad_fields:
+                episode[field] = np.pad(episode[field], pad_width=((history_len-1, 0),(0,0)), constant_values=pad_val)
 
 
 class TrajectoriesDataset(torch.utils.data.Dataset):
@@ -64,25 +96,20 @@ class TrajectoriesDataset(torch.utils.data.Dataset):
 
 
         self.env = gym.make(env_entry)
-        dataset_itr = sequence_dataset(self.env) # TODO pass to atleast 2d...
-
-
+        dataset_itr = sequence_dataset(self.env)
+        
         dataset = EpisodeDataset()
         for i, episode in enumerate(dataset_itr):
-            dataset.add_episode(episode_data = episode) # Add all episodes to a Dataset and apply normalization of rewards and of actions... also atleast 2d
-        # normalization... 
-        # pad later than normalization
-        # pad short episodes to have at least history at left.
-        # pad left and right or only left? 
+            dataset.add_episode(episode_data = episode) # TODO discard episodes lesser than horizon
 
-        # TODO manage cases when episodes has least lenght than horizon or history_len or the sum of it
         # TODO manage max episode lenght... and max n episodes
+        dataset.preprocess(history_len=history_len, pad_val=pad_val)
 
         lenghts_list = dataset.episodes_lenght
         self.indices = self.make_indices(lenghts_list, traj_len=history_len+horizon, stride=stride)
 
         self.dataset = dataset
-        self.get_env_attributes() # TODO resuse from base class
+        self.get_env_attributes()
 
     def make_indices(self, episodes_lengths: list, traj_len: int, max_traj_len: int = 1000, stride: int = 1):
         '''
