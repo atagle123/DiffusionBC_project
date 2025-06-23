@@ -28,7 +28,7 @@ class EpisodeDataset:
     episodes: List[Dict[str, Episode]] = field(default_factory=list)
     episodes_lenght: List[int] = field(default_factory=list)
 
-    def add_episode(self, episode_data: Dict[str, Episode]): # TODO CHANGE CLASSSES MANAGEMENT
+    def add_episode(self, episode_data: Dict[str, Episode]): # TODO Episode class 
         """Add a new episode to the dataset."""
         episode_length = len(episode_data['observations'])
         
@@ -82,9 +82,11 @@ class EpisodeDataset:
 
     def pad(self, history_len: int, pad_val: int = 0, pad_fields: list[str] = ["actions", "observations"]):
         assert history_len>=1
-        for episode in self.episodes: 
+        for episode_lenght, episode in zip(self.episodes_lenght, self.episodes): 
             for field in pad_fields:
                 episode[field] = np.pad(episode[field], pad_width=((history_len-1, 0),(0,0)), constant_values=pad_val)
+            
+            episode_lenght += history_len - 1 # update lenghts to account for padding
 
 
 class TrajectoriesDataset(torch.utils.data.Dataset):
