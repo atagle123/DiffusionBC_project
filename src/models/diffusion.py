@@ -19,11 +19,12 @@ class GaussianDiffusion(nn.Module):
     Base Gaussian diffusion model
     """
 
-    def __init__(self, model, data_dim: int, schedule: str="cosine", n_timesteps: int=15):
+    def __init__(self, model, data_dim: int, schedule: str="cosine", n_timesteps: int=15, cond_drop_prob: float= 0.1):
         super().__init__()
 
         self.model = model
         self.data_dim = data_dim
+        self.cond_drop_prob = cond_drop_prob
 
         schedulers = {
             "cosine": cosine_beta_schedule,
@@ -135,6 +136,11 @@ class GaussianDiffusion(nn.Module):
     def p_mean_variance(self, x, condition, t):
 
         epsilon = self.model(x=x, condition=condition, time=t, training=False)
+        if self.guidance_scale > 0.0:
+            # Classifier-free guidance
+            epsilon_uncond = self.model(x=x, condition=torch.zeros_like(condition), time=t, training=False)
+            epsilon = epsilon + self.guidance_scale * (epsilon - epsilon_uncond)
+
         x_recon = self.predict_start_from_noise(x, t=t, noise=epsilon)
 
         if self.clip_denoised:
@@ -213,6 +219,7 @@ class GaussianDiffusion(nn.Module):
         temperature=0.5,
         disable_progess_bar=True,
         return_chain=False,
+        guidance_scale=1.0, # if 0 no class free guidance... 
         **kwargs,
     ):
 
@@ -249,6 +256,10 @@ class GaussianDiffusion(nn.Module):
     def loss(self, x, condition):
 
         batch_size = len(x)
+
+        cond_mask = torch.rand(batch_size) > self.cond_drop_prob 
+        condition = torch.where(cond_mask[:, None], condition, torch.zeros_like(condition)) # drop condiitons for classifier free guidance
+
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
 
         return self.p_losses(x, condition, t)
@@ -264,6 +275,14 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
         self.model.condition_diffusion(history)
 
         epsilon = self.model(x,t)
+
+        if self.guidance_scale > 0.0: # TODO test 
+            # Classifier-free guidance
+            self.model.clear_conditioning()
+            self.model.condition_diffusion(torch.zeros_like(history))# maybe save two models one unconditional and one conditional
+            epsilon_uncond = self.model(x,t)
+            self.model.clear_conditioning()
+            epsilon = epsilon + self.guidance_scale * (epsilon - epsilon_uncond)
 
         x_recon = self.predict_start_from_noise(x, t=t, noise=epsilon)
 
@@ -282,7 +301,7 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
 
         x = torch.randn(shape, device=device)
 
-        #self.model.condition_diffusion(condition)
+        self.model.condition_diffusion(condition)
 
         chain = [x] if return_chain else None
 
@@ -322,6 +341,10 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
     def loss(self, x, condition):
         assert not self.model.conditioning_set(), "Model conditioned with a pre-existing history. Cannot pre-condition model for loss computations."
         batch_size = len(x)
+
+        cond_mask = torch.rand(batch_size) > self.cond_drop_prob 
+        condition = torch.where(cond_mask[:, None], condition, torch.zeros_like(condition)) # drop condiitons for classifier free guidance
+
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
         losses = self.p_losses(x, condition, t)
         self.model.clear_conditioning()
