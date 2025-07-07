@@ -1,8 +1,9 @@
 defaults:
   - _self_
   - datasets: 
+  - method: film
 
-serial_number: "paper" # additional identification for experiment
+serial_number: "film_test" # additional identification for experiment
 exp_id: "N_${agent.diffusion.n_timesteps}_${agent.diffusion.schedule}_${serial_number}"
 seed: 1264 # this changes
 
@@ -22,17 +23,6 @@ dataset:
 
 agent:
   savepath:  ./logs/pretrained/${datasets.dataset_entry}/${exp_id}/${seed}/models
-
-  diffusion_network:
-    time_emb: 128
-    hidden_dim: 128
-    num_blocks: 3
-    use_layer_norm: True
-    dropout_rate : 0.1
-  
-  film:
-    history_len: 4
-    horizon: 16
 
   diffusion:
     schedule: "cosine"
