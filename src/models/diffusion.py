@@ -210,16 +210,17 @@ class GaussianDiffusion(nn.Module):
     def forward(self, condition):
         """ """
         batch_size = condition.shape[0]
+        print(condition.shape, "cond")
 
         return self.p_sample_loop(condition, shape=(batch_size, self.data_dim))
 
     def setup_sampling(
         self,
         clip_denoised=True,
-        temperature=0.5,
+        temperature=1,
         disable_progess_bar=True,
         return_chain=False,
-        guidance_scale=1.0, # if 0 no class free guidance... 
+        guidance_scale=0, # if 0 no class free guidance... 
         **kwargs,
     ):
 
@@ -227,6 +228,7 @@ class GaussianDiffusion(nn.Module):
         self.clip_denoised = clip_denoised
         self.disable_progess_bar = disable_progess_bar
         self.return_chain = return_chain
+        self.guidance_scale = guidance_scale
 
     # ------------------------------------------ training ------------------------------------------#
 
@@ -270,16 +272,16 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
 
     #------------------------------------------ sampling ------------------------------------------#
 
-    def p_mean_variance(self, x, history, t):
-        assert history is not None  # TODO there must be a condition, in the worst case scenario it consists of only one state. 
-        self.model.condition_diffusion(history)
+    def p_mean_variance(self, x, condition, t):
+        assert condition is not None  # TODO there must be a condition, in the worst case scenario it consists of only one state. 
+        self.model.condition_diffusion(condition)
 
         epsilon = self.model(x,t)
 
         if self.guidance_scale > 0.0: # TODO test 
             # Classifier-free guidance
             self.model.clear_conditioning()
-            self.model.condition_diffusion(torch.zeros_like(history))# maybe save two models one unconditional and one conditional
+            self.model.condition_diffusion(torch.zeros_like(condition))# maybe save two models one unconditional and one conditional
             epsilon_uncond = self.model(x,t)
             self.model.clear_conditioning()
             epsilon = epsilon + self.guidance_scale * (epsilon - epsilon_uncond)
@@ -301,7 +303,7 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
 
         x = torch.randn(shape, device=device)
 
-        self.model.condition_diffusion(condition)
+        #self.model.condition_diffusion(condition) TODO 
 
         chain = [x] if return_chain else None
 
@@ -311,7 +313,7 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
             total=self.n_timesteps,
             disable=self.disable_progess_bar,
         ):
-            x = self.p_sample(x=x, t=t) # TODO fix proeblem with conditioning... 
+            x = self.p_sample(x=x, condition = condition, t=t) # TODO fix proeblem with conditioning... 
 
             if return_chain: 
                 chain.append(x)
@@ -322,6 +324,31 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
         if self.clip_denoised:
             x.clamp_(-1.0, 1.0)
         return Sample(x, chain)
+
+    def setup_sampling(
+        self,
+        clip_denoised=True,
+        temperature=1,
+        disable_progess_bar=True,
+        return_chain=False,
+        horizon = 16, # TODO this should be set in the model...
+        guidance_scale=0, # if 0 no class free guidance... 
+        **kwargs,
+    ):
+
+        self.temperature = temperature
+        self.clip_denoised = clip_denoised
+        self.disable_progess_bar = disable_progess_bar
+        self.return_chain = return_chain
+        self.horizon = horizon
+        self.guidance_scale = guidance_scale
+    
+    @torch.no_grad()
+    def forward(self, condition):
+        """ """
+        batch_size = condition.shape[0]
+
+        return self.p_sample_loop(condition, shape=(batch_size, self.horizon, self.data_dim))
 
     #------------------------------------------ training ------------------------------------------#
 
