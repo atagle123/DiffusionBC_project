@@ -21,7 +21,6 @@ def atleast_2d(x):
 class Episode:
     observations: List[float]
     actions: List[float]
-    rewards: List[float]
 
 @dataclass
 class EpisodeDataset:
@@ -54,23 +53,23 @@ class EpisodeDataset:
     ### preprocessing methods ###
 
     def normalize(self, fields_to_normalize: list[str] = ["actions", "observations"], normalization = "gaussian"): # normalize before padding 
-        norm_params = {}
+        self.norm_params = {}
         for field in fields_to_normalize: # assert field in episode keys
             all_data = np.concatenate([ep[field] for ep in self.episodes], axis=0)
             mean = np.mean(all_data, axis=0)
             std = np.std(all_data, axis=0) + 1e-8
             params = {"mean": mean, 
                       "std": std, 
-                      "max": np.max(all_data, axis=0), 
+                      "max": np.max(all_data, axis=0),
                       "min": np.min(all_data, axis=0)}
-            norm_params[field] = params
-        
+            self.norm_params[field] = params
+            
         for episode in self.episodes:
             for field in fields_to_normalize:
-                if normalization == "gaussian":
-                    episode[field] = (episode[field] - norm_params[field]["mean"]) / norm_params[field]["std"]
+                if normalization == "gaussian":# normalize per data dim... 
+                    episode[field] = (episode[field] - self.norm_params[field]["mean"]) / self.norm_params[field]["std"]
                 elif normalization == "minmax":
-                    episode[field] = (episode[field] - norm_params[field]["min"]) / (norm_params[field]["max"] - norm_params[field]["min"])
+                    episode[field] = (episode[field] - self.norm_params[field]["min"]) / (self.norm_params[field]["max"] - self.norm_params[field]["min"])
                 else:
                     raise ValueError(f"Unknown normalization method: {normalization}")
     
@@ -90,7 +89,7 @@ class EpisodeDataset:
 
 
 class TrajectoriesDataset(torch.utils.data.Dataset):
-    def __init__(self, env_entry, clip_actions_to_eps=True, history_len=1, horizon=16, stride=1,
+    def __init__(self, env_entry, clip_actions_to_eps=True, history_len=4, horizon=16, stride=1,
         max_n_episodes=10000, pad_val=0):
 
         self.history_len = history_len
