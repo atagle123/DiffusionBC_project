@@ -4,88 +4,11 @@ import gym
 import torch
 from dataclasses import dataclass
 from collections import namedtuple
-from src.datasets.dataset_utils import sequence_dataset
+from src.datasets.dataset_utils import sequence_dataset, EpisodeDataset
 from dataclasses import dataclass, field
 from typing import List, Dict
 
 Batch = namedtuple('Batch', 'trajectories conditions')
-
-
-def atleast_2d(x):
-    while x.ndim < 2:
-        x = np.expand_dims(x, axis=-1)
-    return x
-
-
-@dataclass
-class Episode:
-    observations: List[float]
-    actions: List[float]
-
-@dataclass
-class EpisodeDataset:
-    episodes: List[Dict[str, Episode]] = field(default_factory=list)
-    episodes_lenght: List[int] = field(default_factory=list)
-
-    def add_episode(self, episode_data: Dict[str, Episode]): # TODO Episode class 
-        """Add a new episode to the dataset."""
-        episode_length = len(episode_data['observations'])
-        
-        for key in episode_data.keys():
-            episode_data[key]= atleast_2d(episode_data[key])
-
-        self.episodes_lenght.append(episode_length)
-        self.episodes.append(episode_data)
-
-    def get_episode(self, index: int) -> Dict[str, Episode]:
-        """Retrieve an episode by index."""
-        return self.episodes[index]
-
-    def __len__(self):
-        """Return the number of episodes in the dataset."""
-        return len(self.episodes)
-    
-    def preprocess(self, history_len: int, pad_val: int = 0, normalization: str = "gaussian", fields_to_normalize: list[str] = ["actions", "observations"]):
-        self.normalize(fields_to_normalize=fields_to_normalize, normalization=normalization) # normalize before padding
-        self.shift_actions()
-        self.pad(history_len=history_len, pad_val=pad_val)
-    
-    ### preprocessing methods ###
-
-    def normalize(self, fields_to_normalize: list[str] = ["actions", "observations"], normalization = "gaussian"): # normalize before padding 
-        self.norm_params = {}
-        for field in fields_to_normalize: # assert field in episode keys
-            all_data = np.concatenate([ep[field] for ep in self.episodes], axis=0)
-            mean = np.mean(all_data, axis=0)
-            std = np.std(all_data, axis=0) + 1e-8
-            params = {"mean": mean, 
-                      "std": std, 
-                      "max": np.max(all_data, axis=0),
-                      "min": np.min(all_data, axis=0)}
-            self.norm_params[field] = params
-            
-        for episode in self.episodes:
-            for field in fields_to_normalize:
-                if normalization == "gaussian":# normalize per data dim... 
-                    episode[field] = (episode[field] - self.norm_params[field]["mean"]) / self.norm_params[field]["std"]
-                elif normalization == "minmax":
-                    episode[field] = (episode[field] - self.norm_params[field]["min"]) / (self.norm_params[field]["max"] - self.norm_params[field]["min"])
-                else:
-                    raise ValueError(f"Unknown normalization method: {normalization}")
-    
-    def shift_actions(self):
-        """Shift actions to the right by one time step."""
-        for episode in self.episodes:
-            episode['actions'][1:,:] = episode['actions'][:-1,:]
-            episode['actions'][0,:] = 0 # zero padding at the beggining of actions    
-
-    def pad(self, history_len: int, pad_val: int = 0, pad_fields: list[str] = ["actions", "observations"]):
-        assert history_len>=1
-        for episode_lenght, episode in zip(self.episodes_lenght, self.episodes): 
-            for field in pad_fields:
-                episode[field] = np.pad(episode[field], pad_width=((history_len-1, 0),(0,0)), constant_values=pad_val)
-            
-            episode_lenght += history_len - 1 # update lenghts to account for padding
 
 
 class TrajectoriesDataset(torch.utils.data.Dataset):
