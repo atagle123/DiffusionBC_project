@@ -8,8 +8,10 @@ import d4rl.hand_manipulation_suite
 import torch
 from src.utils.arrays import batch_to_device
 from src.agent.bc_agent import BC_Agent_Test
+from src.agent.film_agent import FiLM_Agent
 from src.utils.evaluation import evaluate_parallel
 from src.datasets.bc_dataset import BC_Dataset
+from src.datasets.trajectory_dataset import TrajectoriesDataset
 
 def cycle(dl):
     while True:
@@ -21,7 +23,7 @@ class Trainer:
     def __init__(self, cfg, logging_cfg):  
         self.cfg = cfg
         self.logging_cfg = logging_cfg 
-        self.num_eval_episodes = 20
+        self.num_eval_episodes = 10
 
         if logging_cfg.wandb_log:
             wandb.init(
@@ -30,11 +32,13 @@ class Trainer:
                 config=OmegaConf.to_container(cfg, resolve=True),
             )
 
-        self.dataset = BC_Dataset(env_entry=cfg.dataset.env_entry)
+        self.dataset = TrajectoriesDataset(env_entry=cfg.dataset.env_entry)
+       # self.dataset = BC_Dataset(env_entry=cfg.dataset.env_entry)
         action_dim = self.dataset.action_dim
         state_dim = self.dataset.observation_dim
 
-        self.agent = BC_Agent_Test(
+        self.agent = FiLM_Agent( # TODO INSTANSIATE SEPARATELY... 
+       # self.agent = BC_Agent_Test(
             action_dim=action_dim,
             state_dim=state_dim,
             cfg=cfg,

@@ -282,10 +282,10 @@ class ScoreModel_test(nn.Module):
             activations=nn.SiLU(),
         )
 
-    def forward(self, x, state, time, training=True):
+    def forward(self, x, condition, time, training=True):
         t = self.time_encoder(time)
         cond_emb = self.cond_encoder(t)
-        reverse_input = torch.cat([x, state, cond_emb], dim=-1)
+        reverse_input = torch.cat([x, condition, cond_emb], dim=-1)
         out = self.base_model(reverse_input, training)
 
         return out
