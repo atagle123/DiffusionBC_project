@@ -24,6 +24,7 @@ class Trainer:
         self.cfg = cfg
         self.logging_cfg = logging_cfg 
         self.num_eval_episodes = 10
+        self.val_dataset_ratio = 0.05
 
         if logging_cfg.wandb_log:
             wandb.init(
@@ -68,17 +69,39 @@ class Trainer:
         wandb.finish()
 
     def _load_dataset(self):
-         
-         # load dataset also... TODO SELF.DATASET LOAD
-         self.dataloader = cycle(
+        """
+        Load the dataset and split it into training and validation subsets.
+        """
+        # Split dataset into training and validation subsets
+        dataset_size = len(self.dataset)
+        val_size = int(self.val_dataset_ratio * dataset_size) 
+        train_size = dataset_size - val_size
+
+        train_dataset, val_dataset = torch.utils.data.random_split(
+            self.dataset, [train_size, val_size], generator=torch.Generator().manual_seed(self.cfg.seed)
+        )
+
+        # Create dataloaders for training and validation
+        self.train_dataloader = cycle(
             torch.utils.data.DataLoader(
-                self.dataset,
+                train_dataset,
                 batch_size=self.cfg.agent.training.train_batch_size,
                 num_workers=4,
                 shuffle=True,
-                pin_memory=True, 
+                pin_memory=True,
                 drop_last=True,
-                )
+            )
+        )
+
+        self.val_dataloader = cycle(
+            torch.utils.data.DataLoader(
+                val_dataset,
+                batch_size=self.cfg.agent.training.train_batch_size,
+                num_workers=4,
+                shuffle=False,
+                pin_memory=True,
+                drop_last=False,
+            )
         )
          
     def _log_info(self, info: dict[str, float], step: int, prefix: str) -> None:
