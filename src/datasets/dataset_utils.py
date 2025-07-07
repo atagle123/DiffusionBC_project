@@ -21,13 +21,12 @@ def sequence_dataset(env, dataset=None, **kwargs):
         An iterator through dictionaries with keys:
             observations
             actions
-            rewards
             terminals
     """
     if dataset is None:
         dataset = env.get_dataset(**kwargs)
 
-    N = dataset['rewards'].shape[0]
+    N = dataset['actions'].shape[0]
     data_ = collections.defaultdict(list)
 
     # The newer version of the dataset adds an explicit
