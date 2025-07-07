@@ -29,6 +29,10 @@ agent:
     num_blocks: 3
     use_layer_norm: True
     dropout_rate : 0.1
+  
+  film:
+    history_len: 4
+    horizon: 16
 
   diffusion:
     schedule: "cosine"
