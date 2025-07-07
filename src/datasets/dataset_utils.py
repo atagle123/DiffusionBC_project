@@ -44,8 +44,7 @@ def sequence_dataset(env, dataset=None, **kwargs):
         else:
             final_timestep = (episode_step == env._max_episode_steps - 1)
 
-        for k in ['observations', 'actions', 'rewards']: # change for compatibility with v2 environments
-            if 'metadata' in k: continue
+        for k in ['observations', 'actions']: # for compatibility with v2 environments. only use observation and actions
             data_[k].append(dataset[k][i])
 
         if done_bool or final_timestep:
