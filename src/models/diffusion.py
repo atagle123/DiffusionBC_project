@@ -343,7 +343,9 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
         batch_size = len(x)
 
         cond_mask = torch.rand(batch_size) > self.cond_drop_prob 
-        condition = torch.where(cond_mask[:, None], condition, torch.zeros_like(condition)) # drop condiitons for classifier free guidance
+        cond_mask = cond_mask.to(x.device) # This could be improved using always the same mask
+
+        condition = torch.where(cond_mask[:, None,  None], condition, torch.zeros_like(condition)) # drop condiitons for classifier free guidance
 
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
         losses = self.p_losses(x, condition, t)
