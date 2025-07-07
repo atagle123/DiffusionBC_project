@@ -10,7 +10,7 @@ from src.utils.arrays import report_parameters
 import numpy as np
 
 class HistoryBuffer: 
-    def __init__(self, normalizer, history_len, action_dim, obs_dim, batch_size: int = 10):
+    def __init__(self, normalizer, history_len: int, action_dim: int, obs_dim: int, batch_size: int):
         self.normalizer = normalizer # TODO
         self.history_len = history_len
         self.action_dim = action_dim
@@ -50,11 +50,12 @@ class FiLM_Agent(Agent):
         self.cfg = cfg
         self.action_dim = action_dim
         self.state_dim = state_dim
+        self.history_len = cfg.agent.film.history_len
+        self.horizon = cfg.agent.film.horizon
+
         model = FiLMTemporalUnet(
-            #data_dim=action_dim,
-            #state_dim=state_dim,
-            horizon = 16,
-            history_len = 4, #TODO history len
+            horizon = self.horizon,
+            history_len = self.history_len,
             transition_dim=action_dim+state_dim,
             cond_dim = state_dim, # cond dim is not used... 
             #**cfg.agent.diffusion_network
@@ -73,21 +74,22 @@ class FiLM_Agent(Agent):
         self.ema = EMA(self.cfg.agent.training.ema_decay)
         self.ema_model = copy.deepcopy(self.diffusion_model)
 
-    def config_policy(self):
+    def config_policy(self, batch_size:int):
 
         self.diffusion_model.setup_sampling() # TODO
-        self._init_history_buffer()
+        self._init_history_buffer(batch_size)
     
-    def _init_history_buffer(self):
+    def _init_history_buffer(self, batch_size: int):
         """
         Initializes a history buffer with the current state and action.
 
         """
         self.history_buffer =  HistoryBuffer(
             normalizer= None, # TODO 
-            history_len=4, #self.cfg.agent.diffusion.history_len,
+            history_len=self.history_len,
             action_dim=self.action_dim,
             obs_dim=self.state_dim,
+            batch_size=batch_size, 
         )
 
     def policy(self, state): # TODO... 

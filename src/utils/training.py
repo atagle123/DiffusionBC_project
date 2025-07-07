@@ -114,7 +114,7 @@ class Trainer:
 
                 if step % self.logging_cfg.eval_freq == 0 or step == 1: # log metrics in csv in the pc... or last step...
                     
-                    self.agent.config_policy()  # configure the policy for evaluation
+                    self.agent.config_policy(batch_size = self.num_eval_episodes)  # configure the policy for evaluation
                     policy_fn = lambda state: self.agent.policy(state)
 
                     eval_info = evaluate_parallel(
