@@ -65,19 +65,17 @@ def atleast_2d(x):
         x = np.expand_dims(x, axis=-1)
     return x
 
-
 @dataclass
 class Episode:
     observations: List[float]
     actions: List[float]
-    rewards: List[float]
 
 @dataclass
 class EpisodeDataset:
     episodes: List[Dict[str, Episode]] = field(default_factory=list)
     episodes_lenght: List[int] = field(default_factory=list)
 
-    def add_episode(self, episode_data: Dict[str, Episode]): # TODO CHANGE CLASSSES MANAGEMENT
+    def add_episode(self, episode_data: Dict[str, Episode]): # TODO Episode class 
         """Add a new episode to the dataset."""
         episode_length = len(episode_data['observations'])
         
@@ -95,9 +93,62 @@ class EpisodeDataset:
         """Return the number of episodes in the dataset."""
         return len(self.episodes)
     
-    ### normalization
+    def preprocess(self, history_len: int, pad_val: int = 0, normalization: str = "minmax", fields_to_normalize: list[str] = ["actions", "observations"]):
+        self.normalize_fields(fields_to_normalize=fields_to_normalize, normalization=normalization) # normalize before padding
+        self.shift_actions()
+        self.pad(history_len=history_len, pad_val=pad_val)
+    
+    ### preprocessing methods ###
 
-    def normalize(self):
+    def normalize_fields(self, fields_to_normalize: list[str] = ["actions", "observations"], normalization="gaussian"):
+        """
+        Normalize the specified fields in the dataset using the specified normalization method.
+
+        Args:
+            fields_to_normalize (list[str]): List of fields to normalize (e.g., "actions", "observations").
+            normalization (str): Normalization method ("gaussian" or "minmax").
+        """
+        self.norm_params = self.get_normalization_params(fields_to_normalize=fields_to_normalize)
         
+        # Define normalization function with parameters embedded
+        normalization_func = lambda data, field: (
+            (data - self.norm_params[field]["mean"]) / self.norm_params[field]["std"]
+            if normalization == "gaussian"
+            else (data - self.norm_params[field]["min"])
+            / (self.norm_params[field]["max"] - self.norm_params[field]["min"])
+        )
+
+        # Apply normalization to each episode
         for episode in self.episodes:
-            pass
+            for field in fields_to_normalize:
+                episode[field] = normalization_func(episode[field], field)
+        
+    def get_normalization_params(self, fields_to_normalize):
+        norm_params = {}
+
+        # Compute normalization parameters for each field
+        for field in fields_to_normalize:
+            all_data = np.concatenate([ep[field] for ep in self.episodes], axis=0)
+            params = {
+                "mean": np.nanmean(all_data, axis=0),
+                "std": np.nanstd(all_data, axis=0) + 1e-8,
+                "max": np.max(all_data, axis=0),
+                "min": np.min(all_data, axis=0),
+            }
+            norm_params[field] = params
+
+        return norm_params
+
+    def shift_actions(self):
+        """Shift actions to the right by one time step."""
+        for episode in self.episodes:
+            episode['actions'][1:,:] = episode['actions'][:-1,:]
+            episode['actions'][0,:] = 0 # zero padding at the beggining of actions    
+
+    def pad(self, history_len: int, pad_val: int = 0, pad_fields: list[str] = ["actions", "observations"]):
+        assert history_len>=1
+        for episode_lenght, episode in zip(self.episodes_lenght, self.episodes): 
+            for field in pad_fields:
+                episode[field] = np.pad(episode[field], pad_width=((history_len-1, 0),(0,0)), constant_values=pad_val)
+            
+            episode_lenght += history_len - 1 # update lenghts to account for padding
