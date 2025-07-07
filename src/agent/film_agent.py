@@ -50,8 +50,8 @@ class FiLM_Agent(Agent):
         self.cfg = cfg
         self.action_dim = action_dim
         self.state_dim = state_dim
-        self.history_len = cfg.agent.film.history_len
-        self.horizon = cfg.agent.film.horizon
+        self.history_len = cfg.method.history_len
+        self.horizon = cfg.method.horizon
 
         model = FiLMTemporalUnet(
             horizon = self.horizon,
@@ -109,4 +109,4 @@ class FiLM_Agent(Agent):
 
         actions = samples[:,0, :self.action_dim].cpu().numpy() # first action
         self.history_buffer.add_action(actions)
-        return actions  # Return the first action # unnormalize
+        return actions  # Return the first action # unnormalize TODO 

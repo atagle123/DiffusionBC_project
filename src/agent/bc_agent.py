@@ -18,7 +18,7 @@ class BC_Agent_Test(Agent):
         model = ScoreModel_test(
             data_dim=action_dim,
             state_dim=state_dim,
-            **cfg.agent.diffusion_network
+            **cfg.method.diffusion_network
         ).to(
             DEVICE
         )  # NOTE it is neccesary to sendto device?
@@ -34,7 +34,7 @@ class BC_Agent_Test(Agent):
         self.ema = EMA(self.cfg.agent.training.ema_decay)
         self.ema_model = copy.deepcopy(self.diffusion_model)
 
-    def config_policy(self):
+    def config_policy(self, batch_size: int):
         # assumes that the savepath has trainer, model, diffusion and dataset configs
 
         self.diffusion_model.setup_sampling()
