@@ -26,11 +26,11 @@ class TrajectoriesDataset(torch.utils.data.Dataset):
         for i, episode in enumerate(dataset_itr):
             dataset.add_episode(episode_data = episode) # TODO discard episodes lesser than horizon
 
-        # TODO manage max episode lenght... and max n episodes
+        # TODO manage max episode length... and max n episodes
         dataset.preprocess(history_len=history_len, pad_val=pad_val)
 
-        lenghts_list = dataset.episodes_lenght
-        self.indices = self.make_indices(lenghts_list, traj_len=history_len+horizon, stride=stride)
+        lengths_list = dataset.episodes_length
+        self.indices = self.make_indices(lengths_list, traj_len=history_len+horizon, stride=stride)
 
         self.dataset = dataset
         self.get_env_attributes()
