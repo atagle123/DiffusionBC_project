@@ -13,8 +13,8 @@ def evaluate_parallel(
 
     step = 0
     # Iterate over environment steps
-    with trange(max_num_steps, desc="Evaluating episodes") as t:
-        while not np.all(dones) and step < max_num_steps: # TODO add a max number of steps
+    with trange(max_num_steps-1, desc="Evaluating episodes") as t:
+        while not np.all(dones) and step < max_num_steps:
             actions = policy_fn(observations)
 
             # Collect rewards and update states
