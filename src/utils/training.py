@@ -117,7 +117,7 @@ class Trainer:
         for step in tqdm(range(1, self.cfg.agent.training.steps + 1), smoothing=0.1):
             self.optimizer.zero_grad(set_to_none=True)
 
-            batch = next(self.dataloader)
+            batch = next(self.train_dataloader)
             batch = batch_to_device(batch)
             loss, info = self.agent.diffusion_model.loss(*batch)
 

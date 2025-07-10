@@ -2,7 +2,7 @@ import numpy as np
 import collections
 from dataclasses import dataclass, field
 from typing import List, Dict
-from normalization import GaussianNormalizer, MinMaxNormalizer
+from src.datasets.normalization import GaussianNormalizer, MinMaxNormalizer
 
 ### D4RL utils ###
 
@@ -73,7 +73,7 @@ class Episode:
 @dataclass
 class EpisodeDataset:
     episodes: List[Dict[str, Episode]] = field(default_factory=list)
-    episodes_lenght: List[int] = field(default_factory=list)
+    episodes_length: List[int] = field(default_factory=list)
 
     def add_episode(self, episode_data: Dict[str, Episode]): # TODO Episode class 
         """Add a new episode to the dataset."""
@@ -82,7 +82,7 @@ class EpisodeDataset:
         for key in episode_data.keys():
             episode_data[key]= atleast_2d(episode_data[key])
 
-        self.episodes_lenght.append(episode_length)
+        self.episodes_length.append(episode_length)
         self.episodes.append(episode_data)
 
     def get_episode(self, index: int) -> Dict[str, Episode]:
@@ -111,10 +111,9 @@ class EpisodeDataset:
         self.norm_params = self._get_normalization_params(fields_to_normalize=fields_to_normalize)
         normalization_class = self._get_normalization_class(normalization)
 
-        self.normalize = normalization_class.normalize # TODO test this 
+        self.normalize = normalization_class.normalize
         self.unnormalize = normalization_class.unnormalize
         
-        # TODO Define normalization function with parameters embedded
 
         # Apply normalization to each episode
         for episode in self.episodes:
@@ -134,7 +133,7 @@ class EpisodeDataset:
                 "min": np.min(all_data, axis=0),
             }
             norm_params[field] = params
-
+        print(f"Normalization parameters: {norm_params}")
         return norm_params
 
     def _get_normalization_class(self, normalization):
@@ -156,8 +155,8 @@ class EpisodeDataset:
 
     def pad(self, history_len: int, pad_val: int = 0, pad_fields: list[str] = ["actions", "observations"]):
         assert history_len>=1
-        for episode_lenght, episode in zip(self.episodes_lenght, self.episodes): 
+        for episode_length, episode in zip(self.episodes_length, self.episodes): 
             for field in pad_fields:
                 episode[field] = np.pad(episode[field], pad_width=((history_len-1, 0),(0,0)), constant_values=pad_val)
             
-            episode_lenght += history_len - 1 # update lenghts to account for padding
+            episode_length += history_len - 1 # update lengths to account for padding
