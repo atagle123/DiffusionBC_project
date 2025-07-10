@@ -2,6 +2,7 @@ import numpy as np
 import collections
 from dataclasses import dataclass, field
 from typing import List, Dict
+from normalization import GaussianNormalizer, MinMaxNormalizer
 
 ### D4RL utils ###
 
@@ -57,7 +58,6 @@ def sequence_dataset(env, dataset=None, **kwargs):
         episode_step += 1
 
 
-
 ### Trajectories dataset utils ###
 
 def atleast_2d(x):
@@ -100,7 +100,7 @@ class EpisodeDataset:
     
     ### preprocessing methods ###
 
-    def normalize_fields(self, fields_to_normalize: list[str] = ["actions", "observations"], normalization="gaussian"):
+    def normalize_fields(self, fields_to_normalize: list[str] = ["actions", "observations"], normalization: str = "minmax"):
         """
         Normalize the specified fields in the dataset using the specified normalization method.
 
@@ -108,22 +108,20 @@ class EpisodeDataset:
             fields_to_normalize (list[str]): List of fields to normalize (e.g., "actions", "observations").
             normalization (str): Normalization method ("gaussian" or "minmax").
         """
-        self.norm_params = self.get_normalization_params(fields_to_normalize=fields_to_normalize)
+        self.norm_params = self._get_normalization_params(fields_to_normalize=fields_to_normalize)
+        normalization_class = self._get_normalization_class(normalization)
+
+        self.normalize = normalization_class.normalize # TODO test this 
+        self.unnormalize = normalization_class.unnormalize
         
-        # Define normalization function with parameters embedded
-        normalization_func = lambda data, field: (
-            (data - self.norm_params[field]["mean"]) / self.norm_params[field]["std"]
-            if normalization == "gaussian"
-            else (data - self.norm_params[field]["min"])
-            / (self.norm_params[field]["max"] - self.norm_params[field]["min"])
-        )
+        # TODO Define normalization function with parameters embedded
 
         # Apply normalization to each episode
         for episode in self.episodes:
             for field in fields_to_normalize:
-                episode[field] = normalization_func(episode[field], field)
+                episode[field] = self.normalize(episode[field], field)
         
-    def get_normalization_params(self, fields_to_normalize):
+    def _get_normalization_params(self, fields_to_normalize):
         norm_params = {}
 
         # Compute normalization parameters for each field
@@ -138,6 +136,17 @@ class EpisodeDataset:
             norm_params[field] = params
 
         return norm_params
+
+    def _get_normalization_class(self, normalization):
+        """
+        Factory method to return the appropriate normalizer class.
+        """
+        if normalization == "gaussian":
+            return GaussianNormalizer(self.norm_params)
+        elif normalization == "minmax":
+            return MinMaxNormalizer(self.norm_params)
+        else:
+            raise ValueError(f"Unknown normalization method: {normalization}")
 
     def shift_actions(self):
         """Shift actions to the right by one time step."""
