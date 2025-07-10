@@ -210,7 +210,6 @@ class GaussianDiffusion(nn.Module):
     def forward(self, condition):
         """ """
         batch_size = condition.shape[0]
-        print(condition.shape, "cond")
 
         return self.p_sample_loop(condition, shape=(batch_size, self.data_dim))
 
@@ -259,7 +258,8 @@ class GaussianDiffusion(nn.Module):
 
         batch_size = len(x)
 
-        cond_mask = torch.rand(batch_size) > self.cond_drop_prob 
+        cond_mask = torch.rand(batch_size) > self.cond_drop_prob
+        cond_mask = cond_mask.to(condition.device)
         condition = torch.where(cond_mask[:, None], condition, torch.zeros_like(condition)) # drop condiitons for classifier free guidance
 
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
@@ -283,9 +283,9 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
             self.model.clear_conditioning()
             self.model.condition_diffusion(torch.zeros_like(condition))# maybe save two models one unconditional and one conditional
             epsilon_uncond = self.model(x,t)
-            self.model.clear_conditioning()
             epsilon = epsilon + self.guidance_scale * (epsilon - epsilon_uncond)
-
+            
+        self.model.clear_conditioning()
         x_recon = self.predict_start_from_noise(x, t=t, noise=epsilon)
 
         if self.clip_denoised:
