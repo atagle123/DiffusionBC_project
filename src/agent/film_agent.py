@@ -11,19 +11,17 @@ import numpy as np
 
 class HistoryBuffer: 
     def __init__(self, normalizer, history_len: int, action_dim: int, obs_dim: int, batch_size: int):
-        self.normalizer = normalizer # TODO
+        self.normalizer = normalizer
         self.history_len = history_len
         self.action_dim = action_dim
         self.latest_known_index=history_len # or 0 
-#        initial_observation=self.normalizer.normalize(initial_observation, 'observations')
 
         self.history = np.zeros((batch_size, history_len, obs_dim + action_dim), dtype=np.float32) # zero padding
 
-        #self.history[:,-1, -obs_dim:] = initial_observation # shift when add action
     
     def add_state(self, observations): # needs to handles batch size>1
         observations = self._expand_dims(observations) # add at least 2d check dims B, 1, O
-        #observations = self.normalizer.normalize(observations, 'observations')
+        observations = self.normalizer.normalize(observations, 'observations')
 
         self.history[:,-1, self.action_dim:] = observations  # TODO test this
 
@@ -74,10 +72,11 @@ class FiLM_Agent(Agent):
         self.ema = EMA(self.cfg.agent.training.ema_decay)
         self.ema_model = copy.deepcopy(self.diffusion_model)
 
-    def config_policy(self, batch_size:int):
+    def config_policy(self, batch_size:int, normalizer):
 
         self.diffusion_model.setup_sampling() # TODO
         self._init_history_buffer(batch_size)
+        self.normalizer = normalizer
     
     def _init_history_buffer(self, batch_size: int):
         """
@@ -85,7 +84,7 @@ class FiLM_Agent(Agent):
 
         """
         self.history_buffer =  HistoryBuffer(
-            normalizer= None, # TODO 
+            normalizer= self.normalizer,
             history_len=self.history_len,
             action_dim=self.action_dim,
             obs_dim=self.state_dim,
@@ -109,4 +108,5 @@ class FiLM_Agent(Agent):
 
         actions = samples[:,0, :self.action_dim].cpu().numpy() # first action
         self.history_buffer.add_action(actions)
-        return actions  # Return the first action # unnormalize TODO 
+        actions = self.normalizer.unnormalize(actions, 'actions')
+        return actions  # Return the first action
