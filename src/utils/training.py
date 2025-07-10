@@ -33,14 +33,13 @@ class Trainer:
                 config=OmegaConf.to_container(cfg, resolve=True),
             )
 
-        self.dataset = TrajectoriesDataset(env_entry=cfg.dataset.env_entry)
-       # self.dataset = BC_Dataset(env_entry=cfg.dataset.env_entry)
+        self.dataset = globals()[cfg.method.dataset_class](env_entry=cfg.dataset.env_entry)
+
         self.normalizer = self.dataset.normalizer
         action_dim = self.dataset.action_dim
         state_dim = self.dataset.observation_dim
 
-        self.agent = FiLM_Agent( # TODO INSTANSIATE SEPARATELY... 
-       # self.agent = BC_Agent_Test(
+        self.agent = globals()[cfg.method.agent_class](
             action_dim=action_dim,
             state_dim=state_dim,
             cfg=cfg,
@@ -62,7 +61,7 @@ class Trainer:
             gym.make(self.cfg.dataset.env_entry) for _ in range(self.num_eval_episodes)
         ]
 
-        self._load_dataset() # TODO load dataset here
+        self._load_dataset()
 
     def train(self):
 
@@ -140,6 +139,7 @@ class Trainer:
                     
                     self.agent.config_policy(batch_size = self.num_eval_episodes, 
                                             normalizer = self.normalizer)  # configure the policy for evaluation
+                    
                     policy_fn = lambda state: self.agent.policy(state)
 
                     eval_info = evaluate_parallel(

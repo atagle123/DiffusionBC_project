@@ -1,5 +1,8 @@
 name: "bc_test"
 
+dataset_class: BC_Dataset
+agent_class: BC_Agent_Test
+
 diffusion_network:
   time_emb: 128
   hidden_dim: 128
