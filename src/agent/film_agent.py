@@ -74,9 +74,9 @@ class FiLM_Agent(Agent):
 
     def config_policy(self, batch_size:int, normalizer):
 
-        self.diffusion_model.setup_sampling() # TODO
-        self._init_history_buffer(batch_size)
+        self.diffusion_model.setup_sampling()
         self.normalizer = normalizer
+        self._init_history_buffer(batch_size)
     
     def _init_history_buffer(self, batch_size: int):
         """
