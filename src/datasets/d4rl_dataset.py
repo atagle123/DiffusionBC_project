@@ -24,6 +24,8 @@ class D4RL_Dataset(torch.utils.data.Dataset):
         self.env = gym.make(env_entry)
         dataset = d4rl.qlearning_dataset(self.env)
 
+        self.normalizer = None
+
         if clip_actions_to_eps:
             eps = 1e-5
             lim = 1 - eps

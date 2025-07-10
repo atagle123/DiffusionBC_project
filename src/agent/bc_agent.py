@@ -34,7 +34,7 @@ class BC_Agent_Test(Agent):
         self.ema = EMA(self.cfg.agent.training.ema_decay)
         self.ema_model = copy.deepcopy(self.diffusion_model)
 
-    def config_policy(self, batch_size: int):
+    def config_policy(self, batch_size: int, normalizer):
         # assumes that the savepath has trainer, model, diffusion and dataset configs
 
         self.diffusion_model.setup_sampling()

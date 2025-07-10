@@ -35,6 +35,7 @@ class Trainer:
 
         self.dataset = TrajectoriesDataset(env_entry=cfg.dataset.env_entry)
        # self.dataset = BC_Dataset(env_entry=cfg.dataset.env_entry)
+        self.normalizer = self.dataset.normalizer
         action_dim = self.dataset.action_dim
         state_dim = self.dataset.observation_dim
 
@@ -137,7 +138,8 @@ class Trainer:
 
                 if step % self.logging_cfg.eval_freq == 0 or step == 1: # log metrics in csv in the pc... or last step...
                     
-                    self.agent.config_policy(batch_size = self.num_eval_episodes)  # configure the policy for evaluation
+                    self.agent.config_policy(batch_size = self.num_eval_episodes, 
+                                            normalizer = self.normalizer)  # configure the policy for evaluation
                     policy_fn = lambda state: self.agent.policy(state)
 
                     eval_info = evaluate_parallel(

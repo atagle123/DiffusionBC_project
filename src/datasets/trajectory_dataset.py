@@ -29,6 +29,8 @@ class TrajectoriesDataset(torch.utils.data.Dataset):
         # TODO manage max episode length... and max n episodes
         dataset.preprocess(history_len=history_len, pad_val=pad_val)
 
+        self.normalizer = dataset.normalizer # Get normalizer from dataset after preprocessing, to use in evaluation
+
         lengths_list = dataset.episodes_length
         self.indices = self.make_indices(lengths_list, traj_len=history_len+horizon, stride=stride)
 

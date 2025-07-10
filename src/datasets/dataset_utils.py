@@ -109,16 +109,12 @@ class EpisodeDataset:
             normalization (str): Normalization method ("gaussian" or "minmax").
         """
         self.norm_params = self._get_normalization_params(fields_to_normalize=fields_to_normalize)
-        normalization_class = self._get_normalization_class(normalization)
-
-        self.normalize = normalization_class.normalize
-        self.unnormalize = normalization_class.unnormalize
-        
+        self.normalizer = self._get_normalization_class(normalization)
 
         # Apply normalization to each episode
         for episode in self.episodes:
             for field in fields_to_normalize:
-                episode[field] = self.normalize(episode[field], field)
+                episode[field] = self.normalizer.normalize(episode[field], field)
         
     def _get_normalization_params(self, fields_to_normalize):
         norm_params = {}
