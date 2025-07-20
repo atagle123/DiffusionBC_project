@@ -23,14 +23,23 @@ class HistoryBuffer:
         observations = self._expand_dims(observations) # add at least 2d check dims B, 1, O
         observations = self.normalizer.normalize(observations, 'observations')
 
-        self.history[:,-1, self.action_dim:] = observations  # TODO test this
+        self.history[:,-1, self.action_dim:] = observations
 
     def add_action(self, actions):
-        actions = self._expand_dims(actions) # no normalize when adding actions, shift when adding actions
+        """
+        Adds actions to the history buffer and shifts the buffer to the left to make room for new actions.
 
-        self.history[:, :-1] = self.history[:, 1:]  # shift CHECK 
+        The history buffer maintains a sequence of past actions and observations. When a new action is added:
+        - The entire buffer is shifted left by one position, discarding the oldest entry.
+        - The new action is inserted at the last position in the buffer.
+        - Actions are not normalized here, as normalization is handled elsewhere.
+        - The typical usage pattern is: add_state -> add_action (with shift) -> repeat.
+        """
+        actions = self._expand_dims(actions)
 
-        self.history[:,-1, :self.action_dim] = actions # add actions TODO test this
+        self.history[:, :-1] = self.history[:, 1:] # shift history to the left
+
+        self.history[:,-1, :self.action_dim] = actions
 
     def _expand_dims(self, arr, min_dims=2):
         while arr.ndim < min_dims:
