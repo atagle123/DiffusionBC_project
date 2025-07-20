@@ -10,13 +10,13 @@ from src.utils.arrays import report_parameters
 import numpy as np
 
 class HistoryBuffer: 
-    def __init__(self, normalizer, history_len: int, action_dim: int, obs_dim: int, batch_size: int):
+    def __init__(self, normalizer, history_len: int, action_dim: int, obs_dim: int, batch_size: int, pad_value: float = 0.0):
         self.normalizer = normalizer
         self.history_len = history_len
         self.action_dim = action_dim
         self.latest_known_index=history_len # or 0 
 
-        self.history = np.zeros((batch_size, history_len, obs_dim + action_dim), dtype=np.float32) # zero padding
+        self.history = np.full((batch_size, history_len, obs_dim + action_dim), pad_value, dtype=np.float32)  # fill with pad value
 
     
     def add_state(self, observations): # needs to handles batch size>1
