@@ -15,5 +15,5 @@ conda develop .
 ## Run a experiment
 
 ```bash
-python scripts/train.py datasets={dataset_name} seed={your_seed}
+python scripts/train.py datasets={dataset_name} seed={your_seed} wandb.log=true/false
 ```

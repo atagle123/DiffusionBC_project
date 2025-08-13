@@ -1,7 +1,5 @@
 name: "film"
 
+
 dataset_class: TrajectoriesDataset
 agent_class: FiLM_Agent
-
-history_len: 4
-horizon: 16

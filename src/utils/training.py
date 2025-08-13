@@ -26,15 +26,18 @@ class Trainer:
         self.num_eval_episodes = 10
         self.val_dataset_ratio = 0.05
 
-        if logging_cfg.wandb_log:
+        if cfg.wandb.log:
             wandb.init(
                 project="Diffusion_BC",
-                name=cfg.wandb.wandb_exp_name,
+                name=cfg.wandb.exp_name,
                 config=OmegaConf.to_container(cfg, resolve=True),
             )
 
-        self.dataset = globals()[cfg.method.dataset_class](env_entry=cfg.dataset.env_entry)
-
+        self.dataset = globals()[cfg.method.dataset_class](
+            env_entry=cfg.dataset.env_entry,
+            **cfg.dataset_configs
+        )
+        
         self.normalizer = self.dataset.normalizer
         action_dim = self.dataset.action_dim
         state_dim = self.dataset.observation_dim

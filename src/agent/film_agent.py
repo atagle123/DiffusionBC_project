@@ -57,15 +57,15 @@ class FiLM_Agent(Agent):
         self.cfg = cfg
         self.action_dim = action_dim
         self.state_dim = state_dim
-        self.history_len = cfg.method.history_len
-        self.horizon = cfg.method.horizon
+        self.history_len = cfg.dataset_configs.history_len
+        self.horizon = cfg.dataset_configs.horizon
 
         model = FiLMTemporalUnet(
             horizon = self.horizon,
             history_len = self.history_len,
             transition_dim=action_dim+state_dim,
             cond_dim = state_dim, # cond dim is not used... 
-            #**cfg.agent.diffusion_network
+            **cfg.diffusion_network
         ).to(
             DEVICE
         )  # NOTE it is neccesary to sendto device?

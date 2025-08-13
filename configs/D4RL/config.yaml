@@ -2,6 +2,8 @@ defaults:
   - _self_
   - datasets: 
   - method: film
+  - dataset_configs: ${method}
+  - diffusion_network: ${method}
 
 serial_number: "film_test" # additional identification for experiment
 exp_id: "N_${agent.diffusion.n_timesteps}_${agent.diffusion.schedule}_${serial_number}"
@@ -9,9 +11,10 @@ seed: 1264 # this changes
 
 
 wandb:
-  wandb_dataset: ${datasets.env}_${datasets.policy}
-  wandb_exp_name: ${datasets.env}_${datasets.policy}_${exp_id}_${seed}
-
+  dataset: ${datasets.env}_${datasets.policy}
+  exp_name: ${datasets.env}_${datasets.policy}_${exp_id}_${seed}
+  log: false
+  
 hydra:
   run:
     dir: ./logs/pretrained/${datasets.dataset_entry}/${exp_id}/${seed}
@@ -27,6 +30,7 @@ agent:
   diffusion:
     schedule: "cosine"
     n_timesteps: 15
+    cond_drop_prob: 0.1
 
   training:
     steps: 100000

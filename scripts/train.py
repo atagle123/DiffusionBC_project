@@ -15,7 +15,6 @@ from src.utils.training import Trainer
 @dataclass(frozen=True)
 class Defaults:
     config_path: str = "../configs/D4RL"
-    wandb_log: bool = False
     val_dataset: bool = True
     log_freq: int = 10000
     save_freq: int = 10000
@@ -35,7 +34,6 @@ class TrainingConfig:
     log_freq: int
     save_freq: int
     eval_freq: int
-    wandb_log: bool
     val_dataset: bool
 
 
@@ -52,7 +50,6 @@ def build_training_config(defaults: Defaults) -> TrainingConfig:
         log_freq=defaults.log_freq,
         save_freq=defaults.save_freq,
         eval_freq=defaults.eval_freq,
-        wandb_log=defaults.wandb_log,
         val_dataset=defaults.val_dataset
     )
 
