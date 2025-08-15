@@ -139,7 +139,7 @@ class GaussianDiffusion(nn.Module):
         epsilon = self.model(x=x, condition=condition, time=t, training=False)
         if self.guidance_scale > 0.0:
             # Classifier-free guidance
-            epsilon_uncond = self.model(x=x, condition=torch.zeros_like(condition), time=t, training=False)
+            epsilon_uncond = self.model(x=x, condition=torch.full_like(condition, fill_value=self.pad_value), time=t, training=False) # precompute the torch full like matrix...
             epsilon = epsilon + self.guidance_scale * (epsilon - epsilon_uncond)
 
         x_recon = self.predict_start_from_noise(x, t=t, noise=epsilon)
@@ -282,7 +282,7 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
         if self.guidance_scale > 0.0: # TODO test 
             # Classifier-free guidance
             self.model.clear_conditioning()
-            self.model.condition_diffusion(torch.zeros_like(condition))# maybe save two models one unconditional and one conditional
+            self.model.condition_diffusion(torch.full_like(condition, fill_value=self.pad_value))# maybe save two models one unconditional and one conditional
             epsilon_uncond = self.model(x,t)
             epsilon = epsilon + self.guidance_scale * (epsilon - epsilon_uncond)
             
