@@ -19,12 +19,13 @@ class GaussianDiffusion(nn.Module):
     Base Gaussian diffusion model
     """
 
-    def __init__(self, model, data_dim: int, schedule: str="cosine", n_timesteps: int=15, cond_drop_prob: float= 0.1):
+    def __init__(self, model, data_dim: int, schedule: str="cosine", n_timesteps: int=15, cond_drop_prob: float= 0.1, pad_value: float = 0):
         super().__init__()
 
         self.model = model
         self.data_dim = data_dim
         self.cond_drop_prob = cond_drop_prob
+        self.pad_value = pad_value # used for classifier free guidance
 
         schedulers = {
             "cosine": cosine_beta_schedule,
@@ -260,7 +261,7 @@ class GaussianDiffusion(nn.Module):
 
         cond_mask = torch.rand(batch_size) > self.cond_drop_prob
         cond_mask = cond_mask.to(condition.device)
-        condition = torch.where(cond_mask[:, None], condition, torch.zeros_like(condition)) # drop condiitons for classifier free guidance
+        condition = torch.where(cond_mask[:, None], condition, torch.full_like(condition, fill_value=self.pad_value)) # drop condiitons for classifier free guidance
 
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
 
@@ -372,7 +373,7 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
         cond_mask = torch.rand(batch_size) > self.cond_drop_prob 
         cond_mask = cond_mask.to(x.device) # This could be improved using always the same mask
 
-        condition = torch.where(cond_mask[:, None,  None], condition, torch.zeros_like(condition)) # drop condiitons for classifier free guidance
+        condition = torch.where(cond_mask[:, None,  None], condition, torch.full_like(condition, fill_value=self.pad_value)) # drop condiitons for classifier free guidance
 
         t = torch.randint(0, self.n_timesteps, (batch_size,), device=x.device).long()
         losses = self.p_losses(x, condition, t)
