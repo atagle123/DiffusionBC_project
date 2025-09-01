@@ -93,9 +93,9 @@ class EpisodeDataset:
         """Return the number of episodes in the dataset."""
         return len(self.episodes)
     
-    def preprocess(self, history_len: int, pad_val: int = 0, normalization: str = "minmax", fields_to_normalize: list[str] = ["actions", "observations"]):
+    def preprocess(self, history_len: int, pad_val: float = 0, normalization: str = "minmax", fields_to_normalize: list[str] = ["actions", "observations"]):
         self.normalize_fields(fields_to_normalize=fields_to_normalize, normalization=normalization) # normalize before padding
-        self.shift_actions()
+        self.shift_actions(pad_val=pad_val)
         self.pad(history_len=history_len, pad_val=pad_val)
     
     ### preprocessing methods ###
@@ -143,11 +143,11 @@ class EpisodeDataset:
         else:
             raise ValueError(f"Unknown normalization method: {normalization}")
 
-    def shift_actions(self):
+    def shift_actions(self, pad_val: float = 0.0):
         """Shift actions to the right by one time step."""
         for episode in self.episodes:
             episode['actions'][1:,:] = episode['actions'][:-1,:]
-            episode['actions'][0,:] = 0 # zero padding at the beggining of actions    
+            episode['actions'][0,:] = pad_val # zero padding at the beggining of actions    
 
     def pad(self, history_len: int, pad_val: int = 0, pad_fields: list[str] = ["actions", "observations"]):
         assert history_len>=1
