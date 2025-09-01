@@ -18,7 +18,7 @@ class BC_Agent_Test(Agent):
         model = ScoreModel_test(
             data_dim=action_dim,
             state_dim=state_dim,
-            **cfg.dataset_configs.diffusion_network
+            **cfg.diffusion_network
         ).to(
             DEVICE
         )  # NOTE it is neccesary to sendto device?
