@@ -112,7 +112,6 @@ class FiLM_Agent(Agent):
         """
 
         self.history_buffer.add_state(state)
-        state = torch.tensor(state, dtype=torch.float32, device=DEVICE)
         samples = self.diffusion_model(condition=self.history_buffer()).sample.detach()
 
         actions = samples[:,0, :self.action_dim].cpu().numpy() # first action
