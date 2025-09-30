@@ -19,10 +19,12 @@ class GaussianDiffusion(nn.Module):
     Base Gaussian diffusion model
     """
 
-    def __init__(self, model, data_dim: int, schedule: str="cosine", n_timesteps: int=15, cond_drop_prob: float= 0.1, pad_value: float = 0):
+    def __init__(self, model, data_dim: int, schedule: str="cosine", n_timesteps: int=15, cond_drop_prob: float= 0.1, pad_value: float = 0, compile=False):
         super().__init__()
 
         self.model = model
+        if compile:
+            self.model.compile()
         self.data_dim = data_dim
         self.cond_drop_prob = cond_drop_prob
         self.pad_value = pad_value # used for classifier free guidance
@@ -42,11 +44,15 @@ class GaussianDiffusion(nn.Module):
         alphas_cumprod = torch.cumprod(alphas, axis=0)
         alphas_cumprod_prev = torch.cat([torch.ones(1), alphas_cumprod[:-1]])
 
+        sqrt_alphas = torch.sqrt(alphas)
+
         self.n_timesteps = int(n_timesteps)
 
         register_buffer = lambda name, val: self.register_buffer(
             name, val.to(torch.float32)
         )  # helper function to register buffer from float64 to float32
+
+        register_buffer("sqrt_alphas", sqrt_alphas)
 
         register_buffer("betas", betas)
         register_buffer("alphas_cumprod", alphas_cumprod)

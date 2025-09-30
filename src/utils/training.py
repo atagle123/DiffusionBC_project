@@ -8,10 +8,12 @@ import d4rl.hand_manipulation_suite
 import torch
 from src.utils.arrays import batch_to_device
 from src.agent.bc_agent import BC_Agent_Test
-from src.agent.film_agent import FiLM_Agent
+from src.agent.inpainting_bc_agent import Inpainting_Agent
+from src.agent.film_agent import FiLM_Agent, FiLM_Agent_test, FiLM_Agent_test2, Diffusion_Policy_Agent
 from src.utils.evaluation import evaluate_parallel
 from src.datasets.bc_dataset import BC_Dataset
 from src.datasets.trajectory_dataset import TrajectoriesDataset
+from src.datasets.masked_dataset import MaskedDataset
 
 def cycle(dl):
     while True:
@@ -25,8 +27,9 @@ class Trainer:
         self.logging_cfg = logging_cfg 
         self.num_eval_episodes = 10
         self.val_dataset_ratio = 0.05
+        self.wandb = cfg.wandb.log
 
-        if cfg.wandb.log:
+        if self.wandb:
             wandb.init(
                 project="Diffusion_BC",
                 name=cfg.wandb.exp_name,
@@ -89,7 +92,7 @@ class Trainer:
             torch.utils.data.DataLoader(
                 train_dataset,
                 batch_size=self.cfg.agent.training.train_batch_size,
-                num_workers=4,
+                num_workers=2,
                 shuffle=True,
                 pin_memory=True,
                 drop_last=True,
@@ -100,7 +103,7 @@ class Trainer:
             torch.utils.data.DataLoader(
                 val_dataset,
                 batch_size=self.cfg.agent.training.train_batch_size,
-                num_workers=4,
+                num_workers=2,
                 shuffle=False,
                 pin_memory=True,
                 drop_last=False,
@@ -111,7 +114,7 @@ class Trainer:
         info_str = " | ".join([f"{prefix}/{k}: {v:.4f}" for k, v in info.items()])
         print(f"{info_str} | (step {step})")
 
-        if self.logging_cfg.wandb_log:
+        if self.wandb:
             wandb.log({f"{prefix}/{k}": v for k, v in info.items()}, step=step)
 
     def _train_loop(self):

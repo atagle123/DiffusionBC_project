@@ -1,0 +1,8 @@
+name: "masked_mlp"
+
+dataset_class: MaskedDataset
+agent_class: Inpainting_Agent
+agent_architecture: ScoreModel_test
+
+defaults:
+  - masked_defaults
