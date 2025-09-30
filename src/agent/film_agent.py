@@ -83,7 +83,7 @@ class FiLM_Agent(Agent):
 
     def config_policy(self, batch_size:int, normalizer):
 
-        self.diffusion_model.setup_sampling()
+        self.diffusion_model.setup_sampling(horizon=self.horizon)
         self.normalizer = normalizer
         self._init_history_buffer(batch_size)
     
@@ -112,7 +112,6 @@ class FiLM_Agent(Agent):
         """
 
         self.history_buffer.add_state(state)
-        state = torch.tensor(state, dtype=torch.float32, device=DEVICE)
         samples = self.diffusion_model(condition=self.history_buffer()).sample.detach()
 
         actions = samples[:,0, :self.action_dim].cpu().numpy() # first action

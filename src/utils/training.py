@@ -27,9 +27,9 @@ class Trainer:
         self.logging_cfg = logging_cfg 
         self.num_eval_episodes = 10
         self.val_dataset_ratio = 0.05
-        self.wandb = cfg.wandb.log
+        self.wandb_log = cfg.wandb.log
 
-        if self.wandb:
+        if self.wandb_log:
             wandb.init(
                 project="Diffusion_BC",
                 name=cfg.wandb.exp_name,
@@ -114,7 +114,7 @@ class Trainer:
         info_str = " | ".join([f"{prefix}/{k}: {v:.4f}" for k, v in info.items()])
         print(f"{info_str} | (step {step})")
 
-        if self.wandb:
+        if self.wandb_log:
             wandb.log({f"{prefix}/{k}": v for k, v in info.items()}, step=step)
 
     def _train_loop(self):

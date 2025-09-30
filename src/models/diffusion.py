@@ -338,7 +338,7 @@ class FiLMGaussianDiffusion(GaussianDiffusion):
         temperature=1,
         disable_progess_bar=True,
         return_chain=False,
-        horizon = 16, # TODO this should be set in the model...
+        horizon = 16,
         guidance_scale=0, # if 0 no class free guidance... 
         **kwargs,
     ):
