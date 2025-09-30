@@ -1,0 +1,9 @@
+name: "masked_unet"
+
+
+dataset_class: MaskedDataset
+agent_class: Inpainting_Agent
+agent_architecture: TemporalUnet
+
+defaults:
+  - masked_defaults

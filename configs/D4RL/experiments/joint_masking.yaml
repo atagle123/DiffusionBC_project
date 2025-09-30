@@ -1,0 +1,11 @@
+# @package _global_
+
+method:
+  agent:
+    diffusion:
+      noise_cond: False
+
+dataset_configs:
+  mask_strategy: 'joint'
+  mask_end: False
+  unmask_start: False

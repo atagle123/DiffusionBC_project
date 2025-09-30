@@ -1,0 +1,13 @@
+defaults: 
+  - base_dataset
+  
+horizon: 8
+history_len: 4
+
+pad_val: 0
+mask_cache_size: 20000
+mask_strategy: 'all'
+p_mask_set: [0.125, 0.25, 0.375, 0.50, 0.625, 0.75, 0.875, 1.0]
+# p_mask_set: [0.25, 0.50, 0.75, 1.0]
+unmask_start: False
+mask_end: False

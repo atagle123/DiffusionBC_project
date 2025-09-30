@@ -1,0 +1,11 @@
+# @package _global_
+
+method:
+  agent:
+    diffusion:
+      noise_cond: False
+
+dataset_configs:
+  mask_strategy: 'random_split'
+  mask_end: False
+  unmask_start: False

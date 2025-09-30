@@ -96,7 +96,8 @@ class EpisodeDataset:
     def preprocess(self, history_len: int, pad_val: float = 0, normalization: str = "minmax", fields_to_normalize: list[str] = ["actions", "observations"]):
         self.normalize_fields(fields_to_normalize=fields_to_normalize, normalization=normalization) # normalize before padding
         self.shift_actions(pad_val=pad_val)
-        self.pad(history_len=history_len, pad_val=pad_val)
+        if history_len > 0:
+            self.pad(history_len=history_len, pad_val=pad_val)
     
     ### preprocessing methods ###
 
