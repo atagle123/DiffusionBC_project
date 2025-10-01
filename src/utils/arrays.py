@@ -1,4 +1,6 @@
+import numpy as np
 import torch
+import torch.nn as nn
 
 DTYPE = torch.float
 DEVICE = "cuda:0"
@@ -8,7 +10,7 @@ DEVICE = "cuda:0"
 # -----------------------------------------------------------------------------#
 
 
-def to_np(x):
+def to_np(x) -> np.ndarray:
     if torch.is_tensor(x):
         x = x.detach().cpu().numpy()
     return x
@@ -33,24 +35,21 @@ def to_device(x, device=DEVICE):
         raise RuntimeError(f"Unrecognized type in `to_device`: {type(x)}")
 
 
-
-
-
-def set_device(device):
+def set_device(device: str):
     if "cuda" in device:
         torch.set_default_tensor_type(torch.cuda.FloatTensor)
 
 
-def batch_to_device(batch, device="cuda:0"):
+def batch_to_device(batch, device: str = "cuda:0"):
     vals = [to_device(getattr(batch, field), device) for field in batch._fields]
     return type(batch)(*vals)
 
 
-def _to_str(num):
+def _to_str(num: float) -> str:
     if num >= 1e6:
-        return f"{(num/1e6):.2f} M"
+        return f"{(num / 1e6):.2f} M"
     else:
-        return f"{(num/1e3):.2f} k"
+        return f"{(num / 1e3):.2f} k"
 
 
 # -----------------------------------------------------------------------------#
@@ -63,7 +62,7 @@ def param_to_module(param):
     return module_name
 
 
-def report_parameters(model, topk=10):
+def report_parameters(model: nn.Module, topk: int = 10) -> int:
     counts = {k: p.numel() for k, p in model.named_parameters()}
     n_parameters = sum(counts.values())
     print(f"[ utils/arrays ] Total parameters: {_to_str(n_parameters)}")
@@ -79,6 +78,6 @@ def report_parameters(model, topk=10):
     remaining_parameters = sum([counts[k] for k in sorted_keys[topk:]])
     print(
         " " * 8,
-        f"... and {len(counts)-topk} others accounting for {_to_str(remaining_parameters)} parameters",
+        f"... and {len(counts) - topk} others accounting for {_to_str(remaining_parameters)} parameters",
     )
     return n_parameters

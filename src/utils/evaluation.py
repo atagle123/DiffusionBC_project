@@ -3,17 +3,22 @@ import gym
 from d4rl import get_normalized_score
 from tqdm import trange
 
-def evaluate_parallel(
-    policy_fn, envs, env_entry: str, num_episodes: int, seed: int=42, max_num_steps: int=1000,
-) -> dict[str, float]:
 
+def evaluate_parallel(
+    policy_fn,
+    envs: list,
+    env_entry: str,
+    num_episodes: int,
+    seed: int = 42,
+    max_num_steps: int = 1000,
+) -> dict[str, np.floating]:
     observations = np.array([env.reset() for env in envs])
     dones = np.zeros(num_episodes, dtype=bool)
     episode_returns = np.zeros(num_episodes)
 
     step = 0
     # Iterate over environment steps
-    with trange(max_num_steps-1, desc="Evaluating episodes") as t:
+    with trange(max_num_steps - 1, desc="Evaluating episodes") as t:
         while not np.all(dones) and step < max_num_steps:
             actions = policy_fn(observations)
 
@@ -49,4 +54,4 @@ def evaluate_parallel(
     scores_mean = np.mean(scores)
     scores_std = np.std(scores)
 
-    return {"mean":scores_mean, "std":scores_std}
+    return {"mean": scores_mean, "std": scores_std}

@@ -24,38 +24,43 @@ from src.models.helpers import (
 # ---------------------------------- modules ----------------------------------#
 # -----------------------------------------------------------------------------#
 
-class ResidualTemporalBlock(nn.Module):
 
+class ResidualTemporalBlock(nn.Module):
     def __init__(self, inp_channels, out_channels, embed_dim, horizon, kernel_size=3):
         super().__init__()
 
-        self.blocks = nn.ModuleList([
-            Conv1dBlock(inp_channels, out_channels, kernel_size),
-            Conv1dBlock(out_channels, out_channels, kernel_size),
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                Conv1dBlock(inp_channels, out_channels, kernel_size),
+                Conv1dBlock(out_channels, out_channels, kernel_size),
+            ]
+        )
 
         self.time_mlp = nn.Sequential(
             nn.Mish(),
             nn.Linear(embed_dim, out_channels),
-            Rearrange('batch t -> batch t 1'),
+            Rearrange("batch t -> batch t 1"),
         )
 
-        self.residual_conv = nn.Conv1d(inp_channels, out_channels, 1) \
-            if inp_channels != out_channels else nn.Identity()
+        self.residual_conv = (
+            nn.Conv1d(inp_channels, out_channels, 1)
+            if inp_channels != out_channels
+            else nn.Identity()
+        )
 
     def forward(self, x, t):
-        '''
-            x : [ batch_size x inp_channels x horizon ]
-            t : [ batch_size x embed_dim ]
-            returns:
-            out : [ batch_size x out_channels x horizon ]
-        '''
+        """
+        x : [ batch_size x inp_channels x horizon ]
+        t : [ batch_size x embed_dim ]
+        returns:
+        out : [ batch_size x out_channels x horizon ]
+        """
         out = self.blocks[0](x) + self.time_mlp(t)
         out = self.blocks[1](out)
         return out + self.residual_conv(x)
 
-class ResidualEncodingBlock(nn.Module):
 
+class ResidualEncodingBlock(nn.Module):
     def __init__(self, inp_channels, channels, kernel_size=5):
         super().__init__()
 
@@ -65,13 +70,16 @@ class ResidualEncodingBlock(nn.Module):
             self.blocks.append(Conv1dBlock(in_ch, out_ch, kernel_size))
             in_ch = out_ch
 
-        self.residual_conv = nn.Conv1d(inp_channels, channels[-1], 1) \
-            if inp_channels != channels[-1] else nn.Identity()
+        self.residual_conv = (
+            nn.Conv1d(inp_channels, channels[-1], 1)
+            if inp_channels != channels[-1]
+            else nn.Identity()
+        )
 
     def forward(self, x):
-        '''
+        """
         x -> [ batch x transition x horizon]
-        '''
+        """
         out = x
         for block in self.blocks:
             out = block(out)
@@ -238,7 +246,7 @@ class ScoreModel_test(nn.Module):
         self,
         horizon: int,
         transition_dim: int,
-        hidden_dim: int = 128, 
+        hidden_dim: int = 128,
         time_emb: int = 128,
         num_blocks: int = 3,
         use_layer_norm: bool = True,
@@ -290,15 +298,15 @@ class TemporalUnet(nn.Module):
         kernel_size=3,
         attention=False,
         heads=4,
-        affine=True
+        affine=True,
     ):
         super().__init__()
 
-        norm_kwargs = {'affine': affine}
-        
+        norm_kwargs = {"affine": affine}
+
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
         self.in_out = list(zip(dims[:-1], dims[1:]))
-        print(f'[ models/temporal ] Channel dimensions: {self.in_out}')
+        print(f"[ models/temporal ] Channel dimensions: {self.in_out}")
 
         time_dim = dim
         self.time_mlp = nn.Sequential(
@@ -315,30 +323,96 @@ class TemporalUnet(nn.Module):
         for ind, (dim_in, dim_out) in enumerate(self.in_out):
             is_last = ind >= (num_resolutions - 1)
 
-            self.downs.append(nn.ModuleList([
-                ResidualTemporalBlock(dim_in, dim_out, embed_dim=time_dim, horizon=horizon, kernel_size=kernel_size),
-                ResidualTemporalBlock(dim_out, dim_out, embed_dim=time_dim, horizon=horizon, kernel_size=kernel_size),
-                Residual(PreNorm(dim_out, LinearAttention(dim_out, heads=heads), **norm_kwargs)) if attention else nn.Identity(),
-                Downsample1d(dim_out) if not is_last else nn.Identity()
-            ]))
+            self.downs.append(
+                nn.ModuleList(
+                    [
+                        ResidualTemporalBlock(
+                            dim_in,
+                            dim_out,
+                            embed_dim=time_dim,
+                            horizon=horizon,
+                            kernel_size=kernel_size,
+                        ),
+                        ResidualTemporalBlock(
+                            dim_out,
+                            dim_out,
+                            embed_dim=time_dim,
+                            horizon=horizon,
+                            kernel_size=kernel_size,
+                        ),
+                        Residual(
+                            PreNorm(
+                                dim_out,
+                                LinearAttention(dim_out, heads=heads),
+                                **norm_kwargs,
+                            )
+                        )
+                        if attention
+                        else nn.Identity(),
+                        Downsample1d(dim_out) if not is_last else nn.Identity(),
+                    ]
+                )
+            )
 
             if not is_last:
                 horizon = horizon // 2
 
         mid_dim = dims[-1]
-        self.mid_block1 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon, kernel_size=kernel_size)
-        self.mid_attn = Residual(PreNorm(mid_dim, LinearAttention(mid_dim, heads=heads), **norm_kwargs)) if attention else nn.Identity()
-        self.mid_block2 = ResidualTemporalBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon, kernel_size=kernel_size)
+        self.mid_block1 = ResidualTemporalBlock(
+            mid_dim,
+            mid_dim,
+            embed_dim=time_dim,
+            horizon=horizon,
+            kernel_size=kernel_size,
+        )
+        self.mid_attn = (
+            Residual(
+                PreNorm(mid_dim, LinearAttention(mid_dim, heads=heads), **norm_kwargs)
+            )
+            if attention
+            else nn.Identity()
+        )
+        self.mid_block2 = ResidualTemporalBlock(
+            mid_dim,
+            mid_dim,
+            embed_dim=time_dim,
+            horizon=horizon,
+            kernel_size=kernel_size,
+        )
 
         for ind, (dim_in, dim_out) in enumerate(reversed(self.in_out[1:])):
             is_last = ind >= (num_resolutions - 1)
 
-            self.ups.append(nn.ModuleList([
-                ResidualTemporalBlock(dim_out * 2, dim_in, embed_dim=time_dim, horizon=horizon, kernel_size=kernel_size),
-                ResidualTemporalBlock(dim_in, dim_in, embed_dim=time_dim, horizon=horizon, kernel_size=kernel_size),
-                Residual(PreNorm(dim_in, LinearAttention(dim_in, heads=heads), **norm_kwargs)) if attention else nn.Identity(),
-                Upsample1d(dim_in) if not is_last else nn.Identity()
-            ]))
+            self.ups.append(
+                nn.ModuleList(
+                    [
+                        ResidualTemporalBlock(
+                            dim_out * 2,
+                            dim_in,
+                            embed_dim=time_dim,
+                            horizon=horizon,
+                            kernel_size=kernel_size,
+                        ),
+                        ResidualTemporalBlock(
+                            dim_in,
+                            dim_in,
+                            embed_dim=time_dim,
+                            horizon=horizon,
+                            kernel_size=kernel_size,
+                        ),
+                        Residual(
+                            PreNorm(
+                                dim_in,
+                                LinearAttention(dim_in, heads=heads),
+                                **norm_kwargs,
+                            )
+                        )
+                        if attention
+                        else nn.Identity(),
+                        Upsample1d(dim_in) if not is_last else nn.Identity(),
+                    ]
+                )
+            )
 
             if not is_last:
                 horizon = horizon * 2
@@ -348,14 +422,13 @@ class TemporalUnet(nn.Module):
             nn.Conv1d(dim, transition_dim, 1),
         )
 
-
     def forward(self, x, time, *args, **kwargs):
-        '''
-            x : [ batch x horizon x transition ]
-        '''
+        """
+        x : [ batch x horizon x transition ]
+        """
 
         # process input x as before
-        x = einops.rearrange(x, 'b h t -> b t h')
+        x = einops.rearrange(x, "b h t -> b t h")
 
         t = self.time_mlp(time)
         h = []
@@ -377,10 +450,10 @@ class TemporalUnet(nn.Module):
             x = resnet2(x, t)
             x = attn(x)
             x = upsample(x)
-        
+
         x = self.final_conv(x)
 
-        x = einops.rearrange(x, 'b t h -> b h t')
+        x = einops.rearrange(x, "b t h -> b h t")
         return x
 
 
@@ -390,7 +463,9 @@ class DiTBlock(nn.Module):
         self.norm1 = nn.LayerNorm(d_model, bias=False)
         # self.norm1 = nn.LayerNorm(d_model, bias=True)
         self.t_linear1 = nn.Linear(d_model, d_model)
-        self.attn = nn.MultiheadAttention(d_model, n_heads, batch_first=True) # no dropout on attention weights
+        self.attn = nn.MultiheadAttention(
+            d_model, n_heads, batch_first=True
+        )  # no dropout on attention weights
         self.dropout1 = nn.Dropout(p=p_drop)
 
         self.norm2 = nn.LayerNorm(d_model, bias=False)
@@ -400,9 +475,8 @@ class DiTBlock(nn.Module):
         self.activation = nn.GELU()
         self.linear2 = nn.Linear(d_ff, d_model)
         self.dropout2 = nn.Dropout(p=p_drop)
- 
-    def forward(self, x, t):
 
+    def forward(self, x, t):
         # Attention sublayer
         out = self.norm1(x) + self.t_linear1(t)
         out, _ = self.attn(out, out, out, need_weights=False)
@@ -431,29 +505,34 @@ class DiTBlock(nn.Module):
 
     #     return out
 
+
 class DiT(nn.Module):
-    def __init__(self,
+    def __init__(
+        self,
         horizon,
         transition_dim,
         d_model=1024,
         n_heads=8,
         n_layers=3,
         d_ff=None,
-        p_drop=0.,
+        p_drop=0.0,
         learnable_pos=False,
-        ):
+    ):
         super().__init__()
 
-        assert d_model % n_heads == 0, f"Transformer error: the number of heads {n_heads} does not evenly the hidden dimension {d_model}"
+        assert d_model % n_heads == 0, (
+            f"Transformer error: the number of heads {n_heads} does not evenly the hidden dimension {d_model}"
+        )
 
         d_ff = 4 * d_model if d_ff is None else d_ff
 
         self.embed = nn.Linear(transition_dim, d_model)
         # self.encoder_blocks = nn.Sequential(*[nn.TransformerEncoderLayer(d_model, n_heads, d_ff, dropout=p_drop, activation="gelu", norm_first=True, batch_first=True) for _ in range(n_layers)])
-        self.encoder_blocks = nn.ModuleList([DiTBlock(d_model, n_heads, d_ff, p_drop) for _ in range(n_layers)])
+        self.encoder_blocks = nn.ModuleList(
+            [DiTBlock(d_model, n_heads, d_ff, p_drop) for _ in range(n_layers)]
+        )
         self.out_norm = nn.LayerNorm(d_model)
         self.decoder = nn.Linear(d_model, transition_dim)
-
 
         self.time_mlp = nn.Sequential(
             SinusoidalPosEmb(d_model),
@@ -470,7 +549,16 @@ class DiT(nn.Module):
         self.apply(self._init_weights)
 
     def _init_weights(self, module):
-        ignore_types = (nn.Mish, nn.Dropout, nn.GELU, DiTBlock, SinusoidalPosEmb, nn.Sequential, nn.ModuleList, DiT)
+        ignore_types = (
+            nn.Mish,
+            nn.Dropout,
+            nn.GELU,
+            DiTBlock,
+            SinusoidalPosEmb,
+            nn.Sequential,
+            nn.ModuleList,
+            DiT,
+        )
 
         if isinstance(module, nn.Linear):
             nn.init.normal_(module.weight, mean=0.0, std=0.02)
@@ -481,18 +569,24 @@ class DiT(nn.Module):
             if module.bias is not None:
                 nn.init.zeros_(module.bias)
         elif isinstance(module, nn.MultiheadAttention):
-            weight_names = ('in_proj_weight', 'q_proj_weight', 'k_proj_weight', 'v_proj_weight', 'out_proj')
+            weight_names = (
+                "in_proj_weight",
+                "q_proj_weight",
+                "k_proj_weight",
+                "v_proj_weight",
+                "out_proj",
+            )
             for name in weight_names:
                 weights = getattr(module, name)
-                if name == 'out_proj':
+                if name == "out_proj":
                     weights = weights.weight
                 if weights is not None:
                     nn.init.normal_(weights, mean=0.0, std=0.02)
-            
-            bias_names = ('in_proj_bias', 'bias_k', 'bias_v', 'out_proj')
+
+            bias_names = ("in_proj_bias", "bias_k", "bias_v", "out_proj")
             for name in bias_names:
                 bias = getattr(module, name)
-                if name == 'out_proj':
+                if name == "out_proj":
                     bias = bias.bias
                 if bias is not None:
                     nn.init.zeros_(bias)
@@ -502,17 +596,21 @@ class DiT(nn.Module):
             raise RuntimeError(f"Unrecognised module {module} for initialisation")
 
         if self.learnable_pos:
-            nn.init.normal_(self.pos_emb, mean=0.0, std=0.02) # initialise the learnable positional embedding
+            nn.init.normal_(
+                self.pos_emb, mean=0.0, std=0.02
+            )  # initialise the learnable positional embedding
 
     def forward(self, x, time, *args, **kwargs):
-        '''
-            x : [ batch x horizon x transition ]
-        '''
-        assert x.shape[1] == self.horizon, f"Input sequence length {x.shape[1]} does not match context window length {self.horizon}"
+        """
+        x : [ batch x horizon x transition ]
+        """
+        assert x.shape[1] == self.horizon, (
+            f"Input sequence length {x.shape[1]} does not match context window length {self.horizon}"
+        )
 
         x = self.embed(x) + self.pos_emb
 
-        time = time[:,None]
+        time = time[:, None]
         time = self.time_mlp(time)
 
         for block in self.encoder_blocks:
@@ -528,7 +626,9 @@ class DiT(nn.Module):
 
     def pos_embeddings(self):
         if self.learnable_pos:
-            self.pos_emb = nn.Parameter(torch.zeros((1,self.horizon, self.d_model), device=DEVICE))
+            self.pos_emb = nn.Parameter(
+                torch.zeros((1, self.horizon, self.d_model), device=DEVICE)
+            )
         else:
             assert self.d_model % 2 == 0
             half_dim = self.d_model // 2
@@ -539,4 +639,4 @@ class DiT(nn.Module):
             emb = pos_idx[:, None] * emb[None, :]
             emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
 
-            self.register_buffer("pos_emb", emb[None,:,:])
+            self.register_buffer("pos_emb", emb[None, :, :])

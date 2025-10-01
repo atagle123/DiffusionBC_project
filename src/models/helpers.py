@@ -12,6 +12,7 @@ def extract(a, t, x_shape):
     out = a.gather(-1, t)
     return out.reshape(b, *((1,) * (len(x_shape) - 1)))
 
+
 def divisible_by(numer, denom):
     return (numer % denom) == 0
 
@@ -35,6 +36,7 @@ class SinusoidalPosEmb(nn.Module):
         emb = torch.cat((emb.sin(), emb.cos()), dim=-1)
         return emb
 
+
 class RandomOrLearnedSinusoidalPosEmb(nn.Module):
     """following @crowsonkb 's lead with random (learned optional) sinusoidal pos emb"""
 
@@ -54,11 +56,9 @@ class RandomOrLearnedSinusoidalPosEmb(nn.Module):
         return fouriered
 
 
-
 # -----------------------------------------------------------------------------#
 # ---------------------------------- sampling ---------------------------------#
 # -----------------------------------------------------------------------------#
-
 
 
 def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
@@ -75,14 +75,12 @@ def cosine_beta_schedule(timesteps, s=0.008, dtype=torch.float32):
     return torch.tensor(betas_clipped, dtype=dtype)
 
 
-
 # -----------------------------------------------------------------------------#
 # ---------------------------------- losses -----------------------------------#
 # -----------------------------------------------------------------------------#
 
 
 class WeightedLoss(nn.Module):
-
     def __init__(self, weights, action_dim):
         super().__init__()
         self.register_buffer("weights", weights)
@@ -101,10 +99,7 @@ class WeightedLoss(nn.Module):
         return weighted_loss, {"a0_loss": a0_loss}
 
 
-
-
-### Unet models 
-
+### Unet models
 
 
 class Downsample1d(nn.Module):
@@ -115,6 +110,7 @@ class Downsample1d(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
+
 class Upsample1d(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -123,28 +119,33 @@ class Upsample1d(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
+
 class Conv1dBlock(nn.Module):
-    '''
-        Conv1d --> GroupNorm --> Mish
-    '''
+    """
+    Conv1d --> GroupNorm --> Mish
+    """
 
     def __init__(self, inp_channels, out_channels, kernel_size, n_groups=8):
         super().__init__()
 
         self.block = nn.Sequential(
-            nn.Conv1d(inp_channels, out_channels, kernel_size, padding=kernel_size // 2),
-            Rearrange('batch channels horizon -> batch channels 1 horizon'),
+            nn.Conv1d(
+                inp_channels, out_channels, kernel_size, padding=kernel_size // 2
+            ),
+            Rearrange("batch channels horizon -> batch channels 1 horizon"),
             nn.GroupNorm(n_groups, out_channels),
-            Rearrange('batch channels 1 horizon -> batch channels horizon'),
+            Rearrange("batch channels 1 horizon -> batch channels horizon"),
             nn.Mish(),
         )
 
     def forward(self, x):
         return self.block(x)
 
-#-----------------------------------------------------------------------------#
-#--------------------------------- attention ---------------------------------#
-#-----------------------------------------------------------------------------#
+
+# -----------------------------------------------------------------------------#
+# --------------------------------- attention ---------------------------------#
+# -----------------------------------------------------------------------------#
+
 
 class Residual(nn.Module):
     def __init__(self, fn):
@@ -154,16 +155,17 @@ class Residual(nn.Module):
     def forward(self, x, *args, **kwargs):
         return self.fn(x, *args, **kwargs) + x
 
+
 class LayerNorm(nn.Module):
-    def __init__(self, dim, eps = 1e-5, affine=True):
+    def __init__(self, dim, eps=1e-5, affine=True):
         super().__init__()
         self.eps = eps
         if affine:
             self.g = nn.Parameter(torch.ones(1, dim, 1))
             self.b = nn.Parameter(torch.zeros(1, dim, 1))
-            self.out = lambda z : z * self.g + self.b
+            self.out = lambda z: z * self.g + self.b
         else:
-            self.out = lambda z : z
+            self.out = lambda z: z
 
     def forward(self, x):
         var = torch.var(x, dim=1, unbiased=False, keepdim=True)
@@ -171,6 +173,7 @@ class LayerNorm(nn.Module):
         z = (x - mean) / (var + self.eps).sqrt()
 
         return self.out(z)
+
 
 class PreNorm(nn.Module):
     def __init__(self, dim, fn, Norm=LayerNorm, *args, **kwargs):
@@ -182,38 +185,44 @@ class PreNorm(nn.Module):
         x = self.norm(x)
         return self.fn(x, *args, **kwargs)
 
+
 class LinearAttention(nn.Module):
     def __init__(self, dim, heads=4, dim_head=32):
         super().__init__()
-        self.scale = dim_head ** -0.5
+        self.scale = dim_head**-0.5
         self.heads = heads
         hidden_dim = dim_head * heads
         self.to_qkv = nn.Conv1d(dim, hidden_dim * 3, 1, bias=False)
         self.to_out = nn.Conv1d(hidden_dim, dim, 1)
 
     def forward(self, x):
-        qkv = self.to_qkv(x).chunk(3, dim = 1)
-        q, k, v = map(lambda t: einops.rearrange(t, 'b (h c) d -> b h c d', h=self.heads), qkv)
+        qkv = self.to_qkv(x).chunk(3, dim=1)
+        q, k, v = map(
+            lambda t: einops.rearrange(t, "b (h c) d -> b h c d", h=self.heads), qkv
+        )
         q = q * self.scale
 
-        k = k.softmax(dim = -1)
-        context = torch.einsum('b h d n, b h e n -> b h d e', k, v)
+        k = k.softmax(dim=-1)
+        context = torch.einsum("b h d n, b h e n -> b h d e", k, v)
 
-        out = torch.einsum('b h d e, b h d n -> b h e n', context, q)
-        out = einops.rearrange(out, 'b h c d -> b (h c) d')
+        out = torch.einsum("b h d e, b h d n -> b h e n", context, q)
+        out = einops.rearrange(out, "b h c d -> b (h c) d")
         return self.to_out(out)
+
 
 class ScaledResidual(Residual):
     def forward(self, x, scale, *args, **kwargs):
         return scale * self.fn(x, *args, **kwargs) + x
 
+
 class FiLMedLayerNorm(LayerNorm):
-    def __init__(self, dim, eps = 1e-5):
+    def __init__(self, dim, eps=1e-5):
         super().__init__(dim, eps, affine=False)
 
     def forward(self, x, g, b):
         z = super().forward(x)
-        return z * (1+g) + b
+        return z * (1 + g) + b
+
 
 class FiLMedPreNorm(PreNorm):
     def __init__(self, dim, fn):
@@ -223,26 +232,30 @@ class FiLMedPreNorm(PreNorm):
         x = self.norm(x, g, b)
         return self.fn(x)
 
-class FiLMedLinearAttention(LinearAttention):
-    '''
-        Applies feature-wise linear modulation (FiLM) at the level of transformer heads.
-    '''
-    def forward(self, x, g, b):
-        '''
-            x : [ batch x transition x horizon ]
-            g : [ batch x heads]
-            b : [ batch x heads]
-        '''
 
-        qkv = self.to_qkv(x).chunk(3, dim = 1)
-        q, k, v = map(lambda t: einops.rearrange(t, 'b (h c) d -> b h c d', h=self.heads), qkv)
+class FiLMedLinearAttention(LinearAttention):
+    """
+    Applies feature-wise linear modulation (FiLM) at the level of transformer heads.
+    """
+
+    def forward(self, x, g, b):
+        """
+        x : [ batch x transition x horizon ]
+        g : [ batch x heads]
+        b : [ batch x heads]
+        """
+
+        qkv = self.to_qkv(x).chunk(3, dim=1)
+        q, k, v = map(
+            lambda t: einops.rearrange(t, "b (h c) d -> b h c d", h=self.heads), qkv
+        )
         q = q * self.scale
 
-        k = k.softmax(dim = -1)
-        context = torch.einsum('b h d n, b h e n -> b h d e', k, v)
+        k = k.softmax(dim=-1)
+        context = torch.einsum("b h d n, b h e n -> b h d e", k, v)
 
-        out = torch.einsum('b h d e, b h d n -> b h e n', context, q)
-        g,b = g[:,:,None,None], b[:,:,None,None]
-        out = (1+g) * out + b  # apply FiLM on the transformer heads
-        out = einops.rearrange(out, 'b h c d -> b (h c) d')
+        out = torch.einsum("b h d e, b h d n -> b h e n", context, q)
+        g, b = g[:, :, None, None], b[:, :, None, None]
+        out = (1 + g) * out + b  # apply FiLM on the transformer heads
+        out = einops.rearrange(out, "b h c d -> b (h c) d")
         return self.to_out(out)

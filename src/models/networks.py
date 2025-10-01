@@ -25,53 +25,58 @@ from src.models.helpers import (
 # ---------------------------------- modules ----------------------------------#
 # -----------------------------------------------------------------------------#
 
-class ResidualTemporalBlock(nn.Module):
 
+class ResidualTemporalBlock(nn.Module):
     def __init__(self, inp_channels, out_channels, embed_dim, horizon, kernel_size=5):
         super().__init__()
 
-        self.blocks = nn.ModuleList([
-            Conv1dBlock(inp_channels, out_channels, kernel_size),
-            Conv1dBlock(out_channels, out_channels, kernel_size),
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                Conv1dBlock(inp_channels, out_channels, kernel_size),
+                Conv1dBlock(out_channels, out_channels, kernel_size),
+            ]
+        )
 
         self.time_mlp = nn.Sequential(
             nn.Mish(),
             nn.Linear(embed_dim, out_channels),
-            Rearrange('batch t -> batch t 1'),
+            Rearrange("batch t -> batch t 1"),
         )
 
-        self.residual_conv = nn.Conv1d(inp_channels, out_channels, 1) \
-            if inp_channels != out_channels else nn.Identity()
+        self.residual_conv = (
+            nn.Conv1d(inp_channels, out_channels, 1)
+            if inp_channels != out_channels
+            else nn.Identity()
+        )
 
     def forward(self, x, t):
-        '''
-            x : [ batch_size x inp_channels x horizon ]
-            t : [ batch_size x embed_dim ]
-            scale : [batch_size x out_channels x 1]
-            returns:
-            out : [ batch_size x out_channels x horizon ]
-        '''
+        """
+        x : [ batch_size x inp_channels x horizon ]
+        t : [ batch_size x embed_dim ]
+        scale : [batch_size x out_channels x 1]
+        returns:
+        out : [ batch_size x out_channels x horizon ]
+        """
         out = self.blocks[0](x) + self.time_mlp(t)
         out = self.blocks[1](out)
         return out + self.residual_conv(x)
 
-class ScaledResidualTemporalBlock(ResidualTemporalBlock):
 
+class ScaledResidualTemporalBlock(ResidualTemporalBlock):
     def forward(self, x, t, scale):
-        '''
-            x : [ batch_size x inp_channels x horizon ]
-            t : [ batch_size x embed_dim ]
-            scale : [batch_size x out_channels x 1]
-            returns:
-            out : [ batch_size x out_channels x horizon ]
-        '''
+        """
+        x : [ batch_size x inp_channels x horizon ]
+        t : [ batch_size x embed_dim ]
+        scale : [batch_size x out_channels x 1]
+        returns:
+        out : [ batch_size x out_channels x horizon ]
+        """
         out = self.blocks[0](x) + self.time_mlp(t)
         out = self.blocks[1](out)
         return scale * out + self.residual_conv(x)
 
-class ResidualEncodingBlock(nn.Module):
 
+class ResidualEncodingBlock(nn.Module):
     def __init__(self, inp_channels, channels, kernel_size=5):
         super().__init__()
 
@@ -81,13 +86,16 @@ class ResidualEncodingBlock(nn.Module):
             self.blocks.append(Conv1dBlock(in_ch, out_ch, kernel_size))
             in_ch = out_ch
 
-        self.residual_conv = nn.Conv1d(inp_channels, channels[-1], 1) \
-            if inp_channels != channels[-1] else nn.Identity()
+        self.residual_conv = (
+            nn.Conv1d(inp_channels, channels[-1], 1)
+            if inp_channels != channels[-1]
+            else nn.Identity()
+        )
 
     def forward(self, x):
-        '''
+        """
         x -> [ batch x transition x horizon]
-        '''
+        """
         out = x
         for block in self.blocks:
             out = block(out)
@@ -254,7 +262,7 @@ class ScoreModel_test(nn.Module):
         self,
         data_dim: int,
         state_dim: int,
-        hidden_dim: int = 128, 
+        hidden_dim: int = 128,
         time_emb: int = 128,
         num_blocks: int = 3,
         use_layer_norm: bool = True,
@@ -291,7 +299,6 @@ class ScoreModel_test(nn.Module):
         return out
 
 
-
 #### FiLM 1D unet models
 
 
@@ -308,12 +315,14 @@ class ParentTemporalUnet(nn.Module):
         affine=True,  # ignored if FiLMLayerNorm is True
         scaleResidual=False,
         FiLMLayerNorm=False,
-        FiLMAttn=False
+        FiLMAttn=False,
     ):
         super().__init__()
 
         ResTransform = ScaledResidual if scaleResidual else Residual
-        ResTempBlock = ScaledResidualTemporalBlock if scaleResidual else ResidualTemporalBlock
+        ResTempBlock = (
+            ScaledResidualTemporalBlock if scaleResidual else ResidualTemporalBlock
+        )
         AttnBlock = FiLMedLinearAttention if FiLMAttn else LinearAttention
 
         if FiLMLayerNorm:
@@ -321,11 +330,11 @@ class ParentTemporalUnet(nn.Module):
             norm_kwargs = {}
         else:
             PreNormTransform = PreNorm
-            norm_kwargs = {'affine': affine}
-        
+            norm_kwargs = {"affine": affine}
+
         dims = [transition_dim, *map(lambda m: dim * m, dim_mults)]
         self.in_out = list(zip(dims[:-1], dims[1:]))
-        print(f'[ models/temporal ] Channel dimensions: {self.in_out}')
+        print(f"[ models/temporal ] Channel dimensions: {self.in_out}")
 
         time_dim = dim
         self.time_mlp = nn.Sequential(
@@ -342,30 +351,70 @@ class ParentTemporalUnet(nn.Module):
         for ind, (dim_in, dim_out) in enumerate(self.in_out):
             is_last = ind >= (num_resolutions - 1)
 
-            self.downs.append(nn.ModuleList([
-                ResTempBlock(dim_in, dim_out, embed_dim=time_dim, horizon=horizon),
-                ResTempBlock(dim_out, dim_out, embed_dim=time_dim, horizon=horizon),
-                ResTransform(PreNormTransform(dim_out, AttnBlock(dim_out, heads=heads), **norm_kwargs)) if attention else nn.Identity(),
-                Downsample1d(dim_out) if not is_last else nn.Identity()
-            ]))
+            self.downs.append(
+                nn.ModuleList(
+                    [
+                        ResTempBlock(
+                            dim_in, dim_out, embed_dim=time_dim, horizon=horizon
+                        ),
+                        ResTempBlock(
+                            dim_out, dim_out, embed_dim=time_dim, horizon=horizon
+                        ),
+                        ResTransform(
+                            PreNormTransform(
+                                dim_out, AttnBlock(dim_out, heads=heads), **norm_kwargs
+                            )
+                        )
+                        if attention
+                        else nn.Identity(),
+                        Downsample1d(dim_out) if not is_last else nn.Identity(),
+                    ]
+                )
+            )
 
             if not is_last:
                 horizon = horizon // 2
 
         mid_dim = dims[-1]
-        self.mid_block1 = ResTempBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
-        self.mid_attn = ResTransform(PreNormTransform(mid_dim, AttnBlock(mid_dim, heads=heads), **norm_kwargs)) if attention else nn.Identity()
-        self.mid_block2 = ResTempBlock(mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon)
+        self.mid_block1 = ResTempBlock(
+            mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon
+        )
+        self.mid_attn = (
+            ResTransform(
+                PreNormTransform(
+                    mid_dim, AttnBlock(mid_dim, heads=heads), **norm_kwargs
+                )
+            )
+            if attention
+            else nn.Identity()
+        )
+        self.mid_block2 = ResTempBlock(
+            mid_dim, mid_dim, embed_dim=time_dim, horizon=horizon
+        )
 
         for ind, (dim_in, dim_out) in enumerate(reversed(self.in_out[1:])):
             is_last = ind >= (num_resolutions - 1)
 
-            self.ups.append(nn.ModuleList([
-                ResTempBlock(dim_out * 2, dim_in, embed_dim=time_dim, horizon=horizon),
-                ResTempBlock(dim_in, dim_in, embed_dim=time_dim, horizon=horizon),
-                ResTransform(PreNormTransform(dim_in, AttnBlock(dim_in, heads=heads), **norm_kwargs)) if attention else nn.Identity(),
-                Upsample1d(dim_in) if not is_last else nn.Identity()
-            ]))
+            self.ups.append(
+                nn.ModuleList(
+                    [
+                        ResTempBlock(
+                            dim_out * 2, dim_in, embed_dim=time_dim, horizon=horizon
+                        ),
+                        ResTempBlock(
+                            dim_in, dim_in, embed_dim=time_dim, horizon=horizon
+                        ),
+                        ResTransform(
+                            PreNormTransform(
+                                dim_in, AttnBlock(dim_in, heads=heads), **norm_kwargs
+                            )
+                        )
+                        if attention
+                        else nn.Identity(),
+                        Upsample1d(dim_in) if not is_last else nn.Identity(),
+                    ]
+                )
+            )
 
             if not is_last:
                 horizon = horizon * 2
@@ -376,9 +425,7 @@ class ParentTemporalUnet(nn.Module):
         )
 
 
-
 class FiLMTemporalUnet(ParentTemporalUnet):
-
     def __init__(
         self,
         horizon,
@@ -387,46 +434,64 @@ class FiLMTemporalUnet(ParentTemporalUnet):
         cond_dim,
         dim=32,
         dim_mults=(1, 2, 4, 8),
-        cond_dim_mults=(1,2),
+        cond_dim_mults=(1, 2),
         cond_kernel=5,
-        *args, **kwargs
+        *args,
+        **kwargs,
     ):
-        super().__init__(horizon, transition_dim, cond_dim, dim, dim_mults, *args, affine=False, **kwargs)
+        super().__init__(
+            horizon,
+            transition_dim,
+            cond_dim,
+            dim,
+            dim_mults,
+            *args,
+            affine=False,
+            **kwargs,
+        )
 
         out_channels = [dim * m for m in cond_dim_mults]
-        self.cond_encoder = ResidualEncodingBlock(transition_dim, out_channels, cond_kernel)
+        self.cond_encoder = ResidualEncodingBlock(
+            transition_dim, out_channels, cond_kernel
+        )
         self.cond_out = history_len * out_channels[-1]
 
         self.FiLM_layers = nn.ModuleList([])
         for _, dim_out in self.in_out:
-            self.FiLM_layers.append(nn.Sequential(
-                nn.Linear(self.cond_out, dim_out),
-                nn.Mish(),
-                nn.Linear(dim_out, 2*dim_out)
-            ))
-        
+            self.FiLM_layers.append(
+                nn.Sequential(
+                    nn.Linear(self.cond_out, dim_out),
+                    nn.Mish(),
+                    nn.Linear(dim_out, 2 * dim_out),
+                )
+            )
+
         mid_dim = dim_mults[-1] * dim
-        self.FiLM_layers.append(nn.Sequential(
+        self.FiLM_layers.append(
+            nn.Sequential(
                 nn.Linear(self.cond_out, mid_dim),
                 nn.Mish(),
-                nn.Linear(mid_dim, 2*mid_dim)
-            ))
+                nn.Linear(mid_dim, 2 * mid_dim),
+            )
+        )
 
         for dim_in, _ in reversed(self.in_out[1:]):
-            self.FiLM_layers.append(nn.Sequential(
-                nn.Linear(self.cond_out, dim_in),
-                nn.Mish(),
-                nn.Linear(dim_in, 2*dim_in)
-            ))
-        
+            self.FiLM_layers.append(
+                nn.Sequential(
+                    nn.Linear(self.cond_out, dim_in),
+                    nn.Mish(),
+                    nn.Linear(dim_in, 2 * dim_in),
+                )
+            )
+
         self.FiLM_outputs = []
 
-    def condition_diffusion(self, history):    
-        '''
-            Conditioning only needs to be set once through an entire reverse process.
-            history : [ batch x cond_horizon x transition ]
-        '''
-        history = einops.rearrange(history, 'b h t -> b t h')
+    def condition_diffusion(self, history):
+        """
+        Conditioning only needs to be set once through an entire reverse process.
+        history : [ batch x cond_horizon x transition ]
+        """
+        history = einops.rearrange(history, "b h t -> b t h")
 
         # encode history with temporal convs
         h_embedding = self.cond_encoder(history)
@@ -435,24 +500,26 @@ class FiLMTemporalUnet(ParentTemporalUnet):
         # compute gamma and beta
         self.FiLM_outputs = []
         for film in self.FiLM_layers:
-            g,b = film(h_embedding)[:,:,None].chunk(chunks=2,dim=1)
-            self.FiLM_outputs.append((g,b))
-    
+            g, b = film(h_embedding)[:, :, None].chunk(chunks=2, dim=1)
+            self.FiLM_outputs.append((g, b))
+
     def conditioning_set(self):
-        return len(self.FiLM_outputs) > 0 
-    
+        return len(self.FiLM_outputs) > 0
+
     def clear_conditioning(self):
         self.FiLM_outputs = []
 
     def forward(self, x, time):
-        '''
-            x : [ batch x horizon x transition ]
-        '''
+        """
+        x : [ batch x horizon x transition ]
+        """
 
-        assert len(self.FiLM_outputs) == len(self.FiLM_layers), "Error: conditioning must be set first."
+        assert len(self.FiLM_outputs) == len(self.FiLM_layers), (
+            "Error: conditioning must be set first."
+        )
 
         # process input x as before
-        x = einops.rearrange(x, 'b h t -> b t h')
+        x = einops.rearrange(x, "b h t -> b t h")
 
         t = self.time_mlp(time)
         h = []
@@ -466,8 +533,8 @@ class FiLMTemporalUnet(ParentTemporalUnet):
             x = downsample(x)
 
             # apply FiLM transformation
-            g,b = self.FiLM_outputs[film_idx]
-            x = (1+g)*x + b
+            g, b = self.FiLM_outputs[film_idx]
+            x = (1 + g) * x + b
             film_idx += 1
 
         x = self.mid_block1(x, t)
@@ -475,8 +542,8 @@ class FiLMTemporalUnet(ParentTemporalUnet):
         x = self.mid_block2(x, t)
 
         # apply FiLM transformation
-        g,b = self.FiLM_outputs[film_idx]
-        x = (1+g)*x + b
+        g, b = self.FiLM_outputs[film_idx]
+        x = (1 + g) * x + b
         film_idx += 1
 
         for resnet, resnet2, attn, upsample in self.ups:
@@ -487,11 +554,11 @@ class FiLMTemporalUnet(ParentTemporalUnet):
             x = upsample(x)
 
             # apply FiLM transformation
-            g,b = self.FiLM_outputs[film_idx]
-            x = (1+g)*x + b
+            g, b = self.FiLM_outputs[film_idx]
+            x = (1 + g) * x + b
             film_idx += 1
-        
+
         x = self.final_conv(x)
 
-        x = einops.rearrange(x, 'b t h -> b h t')
+        x = einops.rearrange(x, "b t h -> b h t")
         return x

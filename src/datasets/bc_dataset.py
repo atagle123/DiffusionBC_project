@@ -8,11 +8,10 @@ class BC_Dataset(D4RL_Dataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dataset.observations)
 
-    def __getitem__(self, idx):
-
+    def __getitem__(self, idx: int) -> BC_batch:
         return BC_batch(
             action=self.dataset.actions[idx, :], state=self.dataset.observations[idx, :]
         )

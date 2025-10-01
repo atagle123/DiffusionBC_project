@@ -1,16 +1,16 @@
 from abc import ABC, abstractmethod
 import os
 import torch
+from typing import Union
+import numpy as np
+
 
 class Agent(ABC):
-    def __init__(self):
-        pass
-
     ## ema methods ##
     def reset_parameters(self):
         self.ema_model.load_state_dict(self.diffusion_model.state_dict())
 
-    def step_ema(self, step):
+    def step_ema(self, step: int):
         if step < self.cfg.agent.training.step_start_ema:
             self.reset_parameters()
             return
@@ -18,7 +18,7 @@ class Agent(ABC):
 
     ### save/load methods ###
 
-    def save(self, step):
+    def save(self, step: Union[int, str]):
         """
         saves model and ema to disk;
         """
@@ -31,7 +31,7 @@ class Agent(ABC):
 
         print(f"Saved model to {savepath}", flush=True)
 
-    def load(self, step):
+    def load(self, step: Union[int, str]):
         """
         loads model and ema from disk
         """
@@ -41,7 +41,7 @@ class Agent(ABC):
         self.diffusion_model.load_state_dict(data["model"])
         self.ema_model.load_state_dict(data["ema"])
 
-    def load_latest_step(self, step):
+    def load_latest_step(self, step: Union[int, str]):
         if step == "latest":
             step = self.get_latest_step(self.actor_savepath)
         self.load(step)
@@ -58,9 +58,9 @@ class Agent(ABC):
 
     ### inference ###
     @abstractmethod
-    def config_policy(self):
+    def config_policy(self, *args, **kwargs):
         pass
 
     @abstractmethod
-    def policy(self):
+    def policy(self, state: np.ndarray) -> np.ndarray:
         pass

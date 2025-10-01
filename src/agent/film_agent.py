@@ -1,3 +1,4 @@
+from omegaconf import DictConfig
 from src.agent.agent import Agent
 import torch
 from src.utils.arrays import DEVICE
@@ -8,24 +9,37 @@ from src.models.diffusion import FiLMGaussianDiffusion
 from src.utils.ema import EMA
 from src.utils.arrays import report_parameters
 import numpy as np
+from src.datasets.normalization import BaseNormalizer
 
-class HistoryBuffer: 
-    def __init__(self, normalizer, history_len: int, action_dim: int, obs_dim: int, batch_size: int, pad_value: float = 0.0):
+
+class HistoryBuffer:
+    def __init__(
+        self,
+        normalizer: BaseNormalizer,
+        history_len: int,
+        action_dim: int,
+        obs_dim: int,
+        batch_size: int,
+        pad_value: float = 0.0,
+    ):
         self.normalizer = normalizer
         self.history_len = history_len
         self.action_dim = action_dim
-        self.latest_known_index=history_len # or 0 
+        self.latest_known_index = history_len  # or 0
 
-        self.history = np.full((batch_size, history_len, obs_dim + action_dim), pad_value, dtype=np.float32)  # fill with pad value
+        self.history = np.full(
+            (batch_size, history_len, obs_dim + action_dim), pad_value, dtype=np.float32
+        )  # fill with pad value
 
-    
-    def add_state(self, observations): # needs to handles batch size>1
-        observations = self._expand_dims(observations) # add at least 2d check dims B, 1, O
-        observations = self.normalizer.normalize(observations, 'observations')
+    def add_state(self, observations: np.ndarray):  # needs to handles batch size>1
+        observations = self._expand_dims(
+            observations
+        )  # add at least 2d check dims B, 1, O
+        observations = self.normalizer.normalize(observations, "observations")
 
-        self.history[:,-1, self.action_dim:] = observations
+        self.history[:, -1, self.action_dim :] = observations
 
-    def add_action(self, actions):
+    def add_action(self, actions: np.ndarray):
         """
         Adds actions to the history buffer and shifts the buffer to the left to make room for new actions.
 
@@ -37,21 +51,21 @@ class HistoryBuffer:
         """
         actions = self._expand_dims(actions)
 
-        self.history[:, :-1] = self.history[:, 1:] # shift history to the left
+        self.history[:, :-1] = self.history[:, 1:]  # shift history to the left
 
-        self.history[:,-1, :self.action_dim] = actions
+        self.history[:, -1, : self.action_dim] = actions
 
-    def _expand_dims(self, arr, min_dims=2):
+    def _expand_dims(self, arr: np.ndarray, min_dims: int = 2) -> np.ndarray:
         while arr.ndim < min_dims:
             arr = np.expand_dims(arr, axis=0)  # add dim at the front
         return arr
 
-    def __call__(self, device = "cuda:0"):
+    def __call__(self, device: str = "cuda:0") -> torch.Tensor:
         return torch.tensor(self.history, dtype=torch.float32, device=device)
 
-class FiLM_Agent(Agent):
-    def __init__(self, action_dim, state_dim, cfg):
 
+class FiLM_Agent(Agent):
+    def __init__(self, action_dim: int, state_dim: int, cfg: DictConfig):
         os.makedirs(cfg.agent.savepath, exist_ok=True)
 
         self.cfg = cfg
@@ -61,46 +75,41 @@ class FiLM_Agent(Agent):
         self.horizon = cfg.dataset_configs.horizon
 
         model = FiLMTemporalUnet(
-            horizon = self.horizon,
-            history_len = self.history_len,
-            transition_dim=action_dim+state_dim,
-            cond_dim = state_dim, # cond dim is not used... 
-            **cfg.diffusion_network
-        ).to(
-            DEVICE
-        )  # NOTE it is neccesary to sendto device?
+            horizon=self.horizon,
+            history_len=self.history_len,
+            transition_dim=action_dim + state_dim,
+            cond_dim=state_dim,  # cond dim is not used...
+            **cfg.diffusion_network,
+        ).to(DEVICE)  # NOTE it is neccesary to sendto device?
 
         report_parameters(model)
 
         self.diffusion_model = FiLMGaussianDiffusion(
-            model=model,
-            data_dim=action_dim+state_dim,
-            **cfg.agent.diffusion
+            model=model, data_dim=action_dim + state_dim, **cfg.agent.diffusion
         ).to(DEVICE)
 
         self.ema = EMA(self.cfg.agent.training.ema_decay)
         self.ema_model = copy.deepcopy(self.diffusion_model)
 
-    def config_policy(self, batch_size:int, normalizer):
-
+    def config_policy(self, batch_size: int, normalizer: BaseNormalizer):
         self.diffusion_model.setup_sampling(horizon=self.horizon)
         self.normalizer = normalizer
         self._init_history_buffer(batch_size)
-    
+
     def _init_history_buffer(self, batch_size: int):
         """
         Initializes a history buffer with the current state and action.
 
         """
-        self.history_buffer =  HistoryBuffer(
-            normalizer= self.normalizer,
+        self.history_buffer = HistoryBuffer(
+            normalizer=self.normalizer,
             history_len=self.history_len,
             action_dim=self.action_dim,
             obs_dim=self.state_dim,
-            batch_size=batch_size, 
+            batch_size=batch_size,
         )
 
-    def policy(self, state): # TODO... 
+    def policy(self, state: np.ndarray) -> np.ndarray:
         """
         Generates an action based on the provided state using a diffusion model.
 
@@ -114,7 +123,7 @@ class FiLM_Agent(Agent):
         self.history_buffer.add_state(state)
         samples = self.diffusion_model(condition=self.history_buffer()).sample.detach()
 
-        actions = samples[:,0, :self.action_dim].cpu().numpy() # first action
+        actions = samples[:, 0, : self.action_dim].cpu().numpy()  # first action
         self.history_buffer.add_action(actions)
-        actions = self.normalizer.unnormalize(actions, 'actions')
+        actions = self.normalizer.unnormalize(actions, "actions")
         return actions  # Return the first action

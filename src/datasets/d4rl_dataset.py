@@ -19,8 +19,7 @@ class Dataset:
 
 
 class D4RL_Dataset(torch.utils.data.Dataset):
-    def __init__(self, env_entry, clip_actions_to_eps=True):
-
+    def __init__(self, env_entry, clip_actions_to_eps: bool = True):
         self.env = gym.make(env_entry)
         dataset = d4rl.qlearning_dataset(self.env)
 
@@ -79,7 +78,7 @@ class D4RL_Dataset(torch.utils.data.Dataset):
 
         self.observation_dim = observation_space.shape[0]
 
-    def get_returns(self):
+    def get_returns(self) -> list:
         episode_return = 0
         episode_returns = []
 
@@ -96,7 +95,6 @@ class D4RL_Dataset(torch.utils.data.Dataset):
         return episode_returns
 
     def norm_rewards(self, env_entry):
-
         if "antmaze" in env_entry:
             self.dataset.rewards -= 1.0
 
@@ -113,11 +111,10 @@ class D4RL_Dataset(torch.utils.data.Dataset):
 
             self.dataset.rewards = rewards
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dataset.observations)
 
-    def __getitem__(self, idx):
-
+    def __getitem__(self, idx: int) -> Batch:
         return Batch(
             states=self.dataset.observations[idx, :],
             next_states=self.dataset.next_observations[idx, :],

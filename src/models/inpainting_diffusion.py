@@ -8,15 +8,30 @@ from .helpers import (
     extract,
 )
 
+
 class GaussianInpaintingDiffusion(GaussianDiffusion):
     """
     Gaussian diffusion model for inpainting
     """
 
-    def __init__(self, model, data_dim: int, schedule: str="cosine", n_timesteps: int=15, cond_drop_prob: float=0.0, pad_value: float=0, noise_cond: bool=True, compile: bool=False):
-        assert not (cond_drop_prob > 0.0 and noise_cond), "Cannot use conditional guidance with noised conditioning"
+    def __init__(
+        self,
+        model,
+        data_dim: int,
+        schedule: str = "cosine",
+        n_timesteps: int = 15,
+        cond_drop_prob: float = 0.0,
+        pad_value: float = 0,
+        noise_cond: bool = True,
+        compile: bool = False,
+    ):
+        assert not (cond_drop_prob > 0.0 and noise_cond), (
+            "Cannot use conditional guidance with noised conditioning"
+        )
 
-        super().__init__(model, data_dim, schedule, n_timesteps, cond_drop_prob, pad_value, compile)
+        super().__init__(
+            model, data_dim, schedule, n_timesteps, cond_drop_prob, pad_value, compile
+        )
 
         self.noise_cond = noise_cond
 
@@ -26,11 +41,10 @@ class GaussianInpaintingDiffusion(GaussianDiffusion):
         temperature=1,
         disable_progess_bar=True,
         return_chain=False,
-        horizon = 16, # TODO this should be set in the model...
-        guidance_scale=0, # if 0 no class free guidance... 
+        horizon=16,  # TODO this should be set in the model...
+        guidance_scale=0,  # if 0 no class free guidance...
         **kwargs,
     ):
-
         self.temperature = temperature
         self.clip_denoised = clip_denoised
         self.disable_progess_bar = disable_progess_bar
@@ -40,19 +54,19 @@ class GaussianInpaintingDiffusion(GaussianDiffusion):
 
     @torch.inference_mode()
     def p_mean_variance(self, x, condition, t):
-        '''
+        """
         x: [batch, horizon, transition]
         condition: [batch, history, transition]
-        '''
+        """
 
         _, cond_len, _ = condition.shape
         x_cond = x.clone()
-        x_cond[:,:cond_len,:] = condition
+        x_cond[:, :cond_len, :] = condition
 
         epsilon = self.model(x=x_cond, time=t, training=False)
         if self.guidance_scale > 0.0:
             # Classifier-free guidance
-            epsilon_uncond = self.model(x=x, time=t, training=False) 
+            epsilon_uncond = self.model(x=x, time=t, training=False)
             epsilon = epsilon + self.guidance_scale * (epsilon - epsilon_uncond)
 
         x_recon = self.predict_start_from_noise(x, t=t, noise=epsilon)
@@ -64,21 +78,25 @@ class GaussianInpaintingDiffusion(GaussianDiffusion):
             x_start=x_recon, x_t=x, t=t
         )
         return model_mean, posterior_variance, posterior_log_variance
-    
+
     def noise_condition(self, condition):
         device = condition.device
-        noised_condition = torch.zeros(self.n_timesteps, *(condition.shape), device=device)
+        noised_condition = torch.zeros(
+            self.n_timesteps, *(condition.shape), device=device
+        )
         noised_condition[0] = condition
 
-        for t in range(1,self.n_timesteps):
-            noised_condition[t] = self.noise_step(noised_condition[t-1], t)
-        
+        for t in range(1, self.n_timesteps):
+            noised_condition[t] = self.noise_step(noised_condition[t - 1], t)
+
         return noised_condition
-    
+
     def noise_step(self, x, t):
         b, *_, device = *x.shape, x.device
         t = torch.full((b,), t, device=device, dtype=torch.long)
-        return extract(self.sqrt_alphas, t, x.shape) * x + extract(self.betas, t, x.shape) * torch.randn_like(x)
+        return extract(self.sqrt_alphas, t, x.shape) * x + extract(
+            self.betas, t, x.shape
+        ) * torch.randn_like(x)
 
     def p_sample_loop(self, condition, shape):
         """
@@ -109,7 +127,7 @@ class GaussianInpaintingDiffusion(GaussianDiffusion):
         ):
             cond = condition[t] if self.noise_cond else condition
             x = self.p_sample(x=x, condition=cond, t=t)
-            
+
             if self.return_chain:
                 chain.append(x)
 
@@ -120,22 +138,23 @@ class GaussianInpaintingDiffusion(GaussianDiffusion):
             x.clamp_(-1.0, 1.0)
 
         return Sample(x, chain)
-    
-        
+
     @torch.no_grad()
     def forward(self, condition):
         """ """
         batch_size = condition.shape[0]
 
-        return self.p_sample_loop(condition, shape=(batch_size, self.horizon, self.data_dim))
-    
+        return self.p_sample_loop(
+            condition, shape=(batch_size, self.horizon, self.data_dim)
+        )
+
     # ------------------------------------------ training ------------------------------------------#
 
     def p_losses(self, x_start, mask, t):
         noise = torch.randn_like(x_start)
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
-        x_noisy[mask] = x_start[mask] # apply mask
+        x_noisy[mask] = x_start[mask]  # apply mask
         pred_epsilon = self.model(x_noisy, t, training=True)
 
         assert noise.shape == pred_epsilon.shape
