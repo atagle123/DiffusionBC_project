@@ -1,0 +1,5 @@
+name: "bc_trajectory_defaults"
+
+
+dataset_class: TrajectoriesDataset
+agent_class: FiLM_Agent
