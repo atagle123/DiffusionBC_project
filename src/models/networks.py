@@ -424,6 +424,41 @@ class ParentTemporalUnet(nn.Module):
             nn.Conv1d(dim, transition_dim, 1),
         )
 
+    def forward(self, x, time):
+        """
+        x : [ batch x horizon x transition ]
+        """
+
+        # process input x as before
+        x = einops.rearrange(x, "b h t -> b t h")
+
+        t = self.time_mlp(time)
+        h = []
+
+        film_idx = 0
+        for resnet, resnet2, attn, downsample in self.downs:
+            x = resnet(x, t)
+            x = resnet2(x, t)
+            x = attn(x)
+            h.append(x)
+            x = downsample(x)
+
+        x = self.mid_block1(x, t)
+        x = self.mid_attn(x)
+        x = self.mid_block2(x, t)
+
+        for resnet, resnet2, attn, upsample in self.ups:
+            x = torch.cat((x, h.pop()), dim=1)
+            x = resnet(x, t)
+            x = resnet2(x, t)
+            x = attn(x)
+            x = upsample(x)
+
+        x = self.final_conv(x)
+
+        x = einops.rearrange(x, "b t h -> b h t")
+        return x
+
 
 class FiLMTemporalUnet(ParentTemporalUnet):
     def __init__(
