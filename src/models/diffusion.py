@@ -502,6 +502,7 @@ class GaussianDiffusionRePaint(GaussianDiffusion):
     def p_mean_variance(self, x, t):
         epsilon = self.model(x=x, time=t, training=False)
         if self.repaint_sampling:
+            pass
             # Repaint like sampling
 
         x_recon = self.predict_start_from_noise(x, t=t, noise=epsilon)
