@@ -2,11 +2,8 @@ import numpy as np
 import d4rl
 import gym
 import torch
-from dataclasses import dataclass
 from collections import namedtuple
 from src.datasets.dataset_utils import sequence_dataset, EpisodeDataset
-from dataclasses import dataclass, field
-from typing import List, Dict
 
 Batch = namedtuple("Batch", "trajectories conditions")
 

@@ -3,7 +3,6 @@ import numpy as np
 import gym
 import torch
 from collections import namedtuple
-from typing import List
 
 Batch = namedtuple("Batch", "trajectory mask")
 

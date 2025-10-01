@@ -1,4 +1,5 @@
 from omegaconf import DictConfig
+from src.models.inpainting_networks import TemporalUnet
 from src.agent.agent import Agent
 import torch
 from src.utils.arrays import DEVICE
@@ -61,20 +62,17 @@ class BCTrajectoryAgent(Agent):
         self.cfg = cfg
         self.action_dim = action_dim
         self.state_dim = state_dim
-        self.history_len = cfg.dataset_configs.history_len
         self.horizon = cfg.dataset_configs.horizon
 
-        model = FiLMTemporalUnet(
+        model = TemporalUnet(
             horizon=self.horizon,
-            history_len=self.history_len,
             transition_dim=action_dim + state_dim,
-            cond_dim=state_dim,  # cond dim is not used...
             **cfg.diffusion_network,
         ).to(DEVICE)  # NOTE it is neccesary to sendto device?
 
         report_parameters(model)
 
-        self.diffusion_model = FiLMGaussianDiffusion(
+        self.diffusion_model = GaussianDiffusion(
             model=model, data_dim=action_dim + state_dim, **cfg.agent.diffusion
         ).to(DEVICE)
 
@@ -93,7 +91,7 @@ class BCTrajectoryAgent(Agent):
         """
         self.history_buffer = HistoryBuffer(
             normalizer=self.normalizer,
-            history_len=self.history_len,
+            history_len=0,
             action_dim=self.action_dim,
             obs_dim=self.state_dim,
             batch_size=batch_size,

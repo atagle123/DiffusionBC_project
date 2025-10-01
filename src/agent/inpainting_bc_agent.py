@@ -1,6 +1,4 @@
 from omegaconf import DictConfig
-from src.agent.agent import Agent
-import torch
 from src.utils.arrays import DEVICE
 import os
 import copy
@@ -8,7 +6,8 @@ from src.models.inpainting_networks import ScoreModel_test, TemporalUnet, DiT
 from src.models.inpainting_diffusion import GaussianInpaintingDiffusion
 from src.utils.ema import EMA
 from src.utils.arrays import report_parameters
-from .film_agent import FiLM_Agent, HistoryBuffer
+from src.utils.history_buffer import HistoryBuffer
+from src.agent.film_agent import FiLM_Agent
 from src.datasets.normalization import BaseNormalizer
 import numpy as np
 
