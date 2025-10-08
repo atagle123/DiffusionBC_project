@@ -8,6 +8,9 @@ from src.utils.training import Trainer
 from src.datasets import BC_Dataset, TrajectoriesDataset, MaskedDataset
 from src.agent import BC_Agent_Test, Inpainting_Agent, FiLM_Agent
 import torch
+import transformers
+import math
+from torch.optim.lr_scheduler import LambdaLR
 
 # ---------------------------- #
 #     Constants & Defaults     #
@@ -43,6 +46,19 @@ class TrainingConfig:
 #     Utility Functions        #
 # ---------------------------- #
 
+# def cosine_with_linear_warmup(optimizer, warmup_steps, training_steps, min_lr, last_epoch=-1):
+#     warmup_T = max(1, warmup_steps-1)
+#     training_T = max(1, training_steps-warmup_steps)
+#     def _schedule(step):
+#         if step < warmup_steps:
+#             factor = min_lr + (1.0 - min_lr) * step / warmup_T
+#         else:
+#             k = (step - warmup_steps + 1.0) / training_T
+#             factor = 0.5 * (1.0 - min_lr) * ( 1.0 + math.cos( math.pi * k) ) + min_lr
+#         return max(0, factor)
+
+#     return LambdaLR(optimizer, _schedule, last_epoch)
+
 
 def build_training_config(defaults: Defaults) -> TrainingConfig:
     """
@@ -75,9 +91,23 @@ def build_trainer(cfg: DictConfig, logging_config):
         weight_decay=cfg.agent.training.weight_decay,
     )
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=cfg.agent.training.steps, eta_min=cfg.agent.training.eta_min
+    # scheduler = cosine_with_linear_warmup(
+    #     optimizer,
+    #     cfg.ageng.training.warmup_steps,
+    #     cfg.agent.training.steps,
+    #     cfg.agent.training.eta_min
+    #     )
+
+    scheduler = transformers.get_cosine_with_min_lr_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps = cfg.agent.training.warmup_steps,
+        num_training_steps = cfg.agent.training.steps,
+        min_lr = cfg.agent.training.eta_min
     )
+
+    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    #     optimizer, T_max=cfg.agent.training.steps, eta_min=cfg.agent.training.eta_min
+    # )
 
     return Trainer(
         cfg,
