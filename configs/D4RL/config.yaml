@@ -34,6 +34,7 @@ agent:
 
   training:
     steps: 100000
+    warmup_steps: 5000
     ema_decay: 0.995
     train_batch_size: 1024
     train_lr: 3e-4

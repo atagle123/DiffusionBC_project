@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from src.datasets.normalization import BaseNormalizer
+from src.utils.arrays import DEVICE
 
 
 class HistoryBuffer:
@@ -12,14 +13,16 @@ class HistoryBuffer:
         obs_dim: int,
         batch_size: int,
         pad_value: float = 0.0,
+        device: str = DEVICE
     ):
         self.normalizer = normalizer
         self.history_len = history_len
         self.action_dim = action_dim
         self.latest_known_index = history_len  # or 0
+        self.device = device
 
-        self.history = np.full(
-            (batch_size, history_len, obs_dim + action_dim), pad_value, dtype=np.float32
+        self.history = torch.full(
+            (batch_size, history_len, obs_dim + action_dim), pad_value, dtype=torch.float32, device=DEVICE
         )  # fill with pad value
 
     def add_state(self, observations: np.ndarray):  # needs to handles batch size>1
@@ -28,7 +31,7 @@ class HistoryBuffer:
         )  # add at least 2d check dims B, 1, O
         observations = self.normalizer.normalize(observations, "observations")
 
-        self.history[:, -1, self.action_dim :] = observations
+        self.history[:, -1, self.action_dim :] = torch.from_numpy(observations).to(self.device)
 
     def add_action(self, actions: np.ndarray):
         """
@@ -44,7 +47,7 @@ class HistoryBuffer:
 
         self.history[:, :-1] = self.history[:, 1:]  # shift history to the left
 
-        self.history[:, -1, : self.action_dim] = actions
+        self.history[:, -1, : self.action_dim] = torch.from_numpy(actions).to(self.device)
 
     def _expand_dims(self, arr: np.ndarray, min_dims: int = 2) -> np.ndarray:
         while arr.ndim < min_dims:
@@ -52,4 +55,4 @@ class HistoryBuffer:
         return arr
 
     def __call__(self, device: str = "cuda:0") -> torch.Tensor:
-        return torch.tensor(self.history, dtype=torch.float32, device=device)
+        return self.history
